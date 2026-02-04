@@ -1,6 +1,7 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 import os
 from werkzeug.utils import secure_filename
+from flask_cors import CORS
 
 from ingest.parser import parse_config
 from database import initialize_db, save_upload, save_findings
@@ -8,6 +9,7 @@ from database import initialize_db, save_upload, save_findings
 
 app = Flask(__name__, static_folder='dist', static_url_path="")
 app.config['UPLOAD_FOLDER'] = 'uploads'
+CORS(app)
 
 @app.route("/upload", methods=["POST"])
 def upload_file():
@@ -39,11 +41,55 @@ def upload_file():
         "parsed_output": parsed_data
     }), 200
 
+@app.route("/upload/batch", methods=["POST"])
+def upload_batch():
+    if "files" not in request.files:
+        return jsonify({"error": "No files provided"}), 400
 
-# -----------------------------
-# IMPORTANT:
-# Keep your other API routes (like /history, /findings) ABOVE the catch-all routes below.
-# -----------------------------
+    files = request.files.getlist("files")
+    results = []
+
+    os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
+
+    for file in files:
+        if not file or file.filename.strip() == "":
+            continue
+
+        filename = secure_filename(file.filename)
+        filepath = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+
+        try:
+            file.save(filepath)
+
+            parsed_data = parse_config(filepath)
+            raw_config = parsed_data.get("raw_config")
+            findings = parsed_data.get("findings", [])
+
+            upload_id = save_upload(filename, raw_config)
+            save_findings(upload_id, findings)
+
+            results.append({
+                "filename": filename,
+                "upload_id": upload_id,
+                "status": "success",
+                "findings_count": len(findings),
+                "error": parsed_data.get("error")
+            })
+
+        except Exception as e:
+            results.append({
+                "filename": filename,
+                "status": "failed",
+                "error": str(e)
+            })
+
+    return jsonify({
+        "message": "Batch upload completed",
+        "total_files": len(files),
+        "results": results
+    }), 200
+
+# Keep other API routes (like /history, /findings) ABOVE the catch-all routes below
 
 @app.route("/")
 def index():

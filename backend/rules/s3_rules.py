@@ -40,29 +40,18 @@ def detect_public_s3_bucket(policy_json):
 
     seen = set()  # prevent duplicate findings
 
-    for stmt in statements:
+    for idx, stmt in enumerate(statements):
         if not isinstance(stmt, dict):
             continue
 
-        effect = str(stmt.get("Effect", "")).strip()
+        path = f"Statement[{idx}]"
+
+        effect = str(stmt.get("Effect", "")).strip().lower()
         principal = stmt.get("Principal", {})
         actions = _to_list(stmt.get("Action", []))
 
         public = _is_public_principal(principal)
-        allow = (effect.lower() == "allow")
-
-        # Rule A: Public principal (high-level warning)
-        if public:
-            key = ("public_principal",)
-            if key not in seen:
-                findings.append({
-                    "type": "s3",
-                    "issue": "Public S3 access (Principal '*')",
-                    "detail": "Bucket policy grants access to everyone. Risk of data exposure.",
-                    "severity": "critical",
-                    "nist_reference": "NIST SP 800-53 SC-28"
-                })
-                seen.add(key)
+        allow = (effect == "allow")
 
         # Rule B: Public read access specifically (more specific)
         # If Action includes s3:GetObject and it is Allow + public principal
@@ -75,7 +64,24 @@ def detect_public_s3_bucket(policy_json):
                     "issue": "S3 public read access (s3:GetObject)",
                     "detail": "Object read permissions are open to the public (Allow + public Principal).",
                     "severity": "high",
-                    "nist_reference": "CIS AWS Benchmark 3.1"
+                    "nist_reference": "CIS AWS Benchmark 3.1",
+                    "path": path
+                })
+                seen.add(key)
+            continue
+
+
+        # Rule A: Public principal (high-level warning)
+        if allow and public:
+            key = ("public_principal",)
+            if key not in seen:
+                findings.append({
+                    "type": "s3",
+                    "issue": "Public S3 access (Principal '*')",
+                    "detail": "Bucket policy grants access to everyone. Risk of data exposure.",
+                    "severity": "critical",
+                    "nist_reference": "NIST SP 800-53 SC-28",
+                    "path": path
                 })
                 seen.add(key)
 

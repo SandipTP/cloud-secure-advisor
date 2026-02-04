@@ -7,6 +7,7 @@ from pathlib import Path
 from rules.iam_rules import detect_overly_permissive_iam
 from rules.s3_rules import detect_public_s3_bucket
 from rules.sg_rules import detect_open_security_group
+from validate.config_validator import validate_iam_policy
 
 
 SUPPORTED_JSON = {".json"}
@@ -15,7 +16,7 @@ SUPPORTED_YAML = {".yaml", ".yml"}
 
 def _ensure_finding_shape(finding: dict) -> dict:
     """
-    Make sure every finding has the exact keys that database.save_findings()
+    every finding has the exact keys that database.save_findings()
     expects, so we never crash with KeyError.
     """
     return {
@@ -36,7 +37,7 @@ def parse_config(filepath: str) -> dict:
       "raw_config": <dict|list|...>,
       "findings": [ {type, issue, detail, severity, nist_reference}, ... ],
       "file_type": "json" | "yaml",
-      "resource_hints": [ ... ],   # optional helper info
+      "resource_hints": [ ... ],
       "error": <string or None>
     }
     """
@@ -53,10 +54,21 @@ def parse_config(filepath: str) -> dict:
         findings = []
         resource_hints = []
 
-        # ---- Detect likely config type & run matching rules ----
+        # Detect likely config type & run matching rules 
         # IAM policy docs commonly have "Statement"
         if isinstance(data, dict) and "Statement" in data:
             resource_hints.append("iam_policy_or_s3_bucket_policy")
+
+        # STEP 2: Validate IAM policy structure FIRST
+            error = validate_iam_policy(data)
+            if error:
+                return {
+                    "file_type": "json",
+                    "raw_config": None,
+                    "findings": [],
+                    "resource_hints": resource_hints,
+                    "error": error,
+                }
 
             # IAM rules (overly permissive policy)
             findings.extend(detect_overly_permissive_iam(data))
