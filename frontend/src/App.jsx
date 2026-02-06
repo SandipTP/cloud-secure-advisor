@@ -1,117 +1,114 @@
 import { useState } from "react";
 
 function App() {
-  const [file, setFile] = useState(null);
-  const [result, setResult] = useState(null);
+  const [files, setFiles] = useState([]);
+  const [results, setResults] = useState([]);
+  const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const findings = result?.parsed_output?.findings || [];
-  const counts = findings.reduce(
-    (acc, f) => {
-      acc.total += 1;
-      acc[f.severity] = (acc[f.severity] || 0) + 1;
-      return acc;
-    },
-    { total: 0 }
-  );
-  const getSeverityColor = (severity) => {
-    switch (severity) {
-      case "critical":
-        return "#d9534f";
-      case "high":
-        return "#f0ad4e";
-      default:
-        return "#5bc0de";
-    }
-  };
-
-  const handleSubmit = async (e) => {
+  const handleBatchUpload = async (e) => {
     e.preventDefault();
-    if (!file) return;
+    if (files.length === 0) {
+      setError("Please select at least one file");
+      return;
+    }
 
     setLoading(true);
     setError(null);
-    setResult(null);
+    setResults([]);
+    setSummary(null);
 
     const formData = new FormData();
-    formData.append("file", file);
+    files.forEach((file) => {
+      formData.append("files", file);
+    });
 
     try {
-      const response = await fetch("http://127.0.0.1:5000/upload", {
+      const response = await fetch("http://127.0.0.1:5000/upload/batch", {
         method: "POST",
         body: formData,
       });
 
       const data = await response.json();
-      setResult(data);
+      setResults(data.results || []);
+
+      // ---- Batch summary ----
+      let totalFindings = 0;
+      data.results.forEach(r => {
+        totalFindings += r.findings_count || 0;
+      });
+
+      setSummary({
+        totalFiles: data.total_files,
+        totalFindings
+      });
+
     } catch (err) {
-      setError("Upload failed");
+      setError("Batch upload failed");
     } finally {
       setLoading(false);
     }
   };
 
+
   return (
-    <div style={{ padding: "2rem" }}>
+    <div style={{ padding: "2rem", maxWidth: "900px", margin: "0 auto" }}>
       <h1>Cloud Secure Advisor</h1>
 
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleBatchUpload}>
         <input
           type="file"
           accept=".json"
+          multiple
           onChange={(e) => {
-            setFile(e.target.files[0]);
-            setResult(null);
+            setFiles([...e.target.files]);
+            setResults(null);
+            setSummary(null);
             setError(null);
           }}
         />
+
+        <br /><br />
+
         <button type="submit" disabled={loading}>
-          {loading ? "Uploading..." : "Upload"}
+          {loading ? "Uploading..." : "Upload Files"}
         </button>
       </form>
 
       {error && <p style={{ color: "red" }}>{error}</p>}
 
-      {findings.length > 0 && (
+      {summary && (
         <div style={{ marginTop: "2rem", marginBottom: "1rem" }}>
-          <h2>Findings Summary</h2>
-          <p><strong>Total:</strong> {counts.total}</p>
-          <p style={{ color: "#d9534f" }}>
-            <strong>Critical:</strong> {counts.critical || 0}
-          </p>
-          <p style={{ color: "#f0ad4e" }}>
-            <strong>High:</strong> {counts.high || 0}
-          </p>
+          <h2>Summary</h2>
+          <p><strong>Total Files:</strong> {summary.totalFiles}</p>
+          <p><strong>Total Findings:</strong> {summary.totalFindings}</p>
         </div>
       )}
 
-      {result?.parsed_output?.findings && (
+      {Array.isArray(results) && results.length > 0 && (
         <div style={{ marginTop: "2rem" }}>
-          <h2>Findings</h2>
+          <h2>Batch Results</h2>
 
-          {result.parsed_output.findings.map((f, idx) => (
+          {results.map((r, idx) => (
             <div
               key={idx}
               style={{
                 border: "1px solid #ddd",
-                borderLeft: `6px solid ${getSeverityColor(f.severity)}`,
                 padding: "1rem",
                 marginBottom: "1rem",
                 borderRadius: "4px",
               }}
             >
-              <h3>{f.issue}</h3>
-              <p><strong>Severity:</strong> {f.severity}</p>
-              <p>{f.detail}</p>
-              <p><strong>Standard:</strong> {f.nist_reference}</p>
+              <h3>{r.filename}</h3>
+              <p><strong>Status:</strong> {r.status}</p>
+              <p><strong>Findings Count:</strong> {r.findings_count}</p>
+              {r.error && <p style={{ color: "red" }}>{r.error}</p>}
             </div>
           ))}
         </div>
       )}
-
     </div>
-
   );
 }
 
