@@ -1,0 +1,236 @@
+[
+    {
+        "category": "IAM",
+        "issue": "Wildcard Administrator Access",
+        "severity": "CRITICAL",
+        "pattern": "\"Action\": \"*\"",
+        "detail": "The policy allows all actions across all resources. This is a severe violation of the principle of least privilege.",
+        "remediation": "Restrict 'Action' to specific API calls (e.g., s3:GetObject).",
+        "nist_reference": "AC-6 (Least Privilege), AC-3 (Access Enforcement)"
+    },
+    {
+        "category": "S3",
+        "issue": "Public Bucket Access",
+        "severity": "CRITICAL",
+        "pattern": "\"Principal\": \"*\"",
+        "detail": "The resource is accessible by any user on the internet without authentication.",
+        "remediation": "Restrict 'Principal' to specific AWS Account ARNs or IAM users.",
+        "nist_reference": "AC-3 (Access Enforcement), SC-7 (Boundary Protection)"
+    },
+    {
+        "category": "Network",
+        "issue": "Open SSH (Port 22)",
+        "severity": "HIGH",
+        "pattern": "\"FromPort\": 22, \"CidrIp\": \"0.0.0.0/0\"",
+        "detail": "The SSH port is open to the entire internet, increasing the risk of brute-force attacks.",
+        "remediation": "Change CidrIp to a specific trusted IP or range.",
+        "nist_reference": "SC-7 (Boundary Protection), AC-17 (Remote Access)"
+    },
+    {
+        "category": "Network",
+        "issue": "Open RDP (Port 3389)",
+        "severity": "HIGH",
+        "pattern": "\"FromPort\": 3389, \"CidrIp\": \"0.0.0.0/0\"",
+        "detail": "Remote Desktop Protocol is exposed to the public internet.",
+        "remediation": "Close port 3389 or restrict it to a VPN gateway.",
+        "nist_reference": "SC-7 (Boundary Protection), AC-17 (Remote Access)"
+    },
+    {
+        "category": "Encryption",
+        "issue": "Unencrypted S3 Bucket",
+        "severity": "MEDIUM",
+        "pattern": "\"SSEEnabled\": false",
+        "detail": "Data at rest is not encrypted, which may violate compliance standards like HIPAA or PCI-DSS.",
+        "remediation": "Set 'SSEEnabled' to true and use AES-256 or KMS.",
+        "nist_reference": "SC-28 (Protection of Information at Rest), SC-13 (Cryptographic Protection)"
+    },
+    {
+        "category": "IAM",
+        "issue": "User Management Privileges",
+        "severity": "HIGH",
+        "pattern": "\"Action\": \"iam:*\"",
+        "detail": "The user has full control over IAM, allowing them to create new admin users or delete accounts.",
+        "remediation": "Apply more granular IAM permissions.",
+        "nist_reference": "AC-6 (Least Privilege), AC-3 (Access Enforcement)"
+    },
+    {
+        "category": "Network",
+        "issue": "Unencrypted HTTP Access",
+        "severity": "MEDIUM",
+        "pattern": "\"FromPort\": 80, \"CidrIp\": \"0.0.0.0/0\"",
+        "detail": "Traffic is allowed over unencrypted HTTP (Port 80) instead of HTTPS.",
+        "remediation": "Redirect Port 80 traffic to Port 443 (HTTPS).",
+        "nist_reference": "SC-8 (Transmission Confidentiality and Integrity), SC-13 (Cryptographic Protection)"
+    },
+    {
+        "category": "Database",
+        "issue": "Public RDS Instance",
+        "severity": "CRITICAL",
+        "pattern": "\"PubliclyAccessible\": true",
+        "detail": "The database instance is reachable from the public internet.",
+        "remediation": "Set 'PubliclyAccessible' to false and use a private subnet.",
+        "nist_reference": "SC-7 (Boundary Protection), AC-3 (Access Enforcement)"
+    },
+    {
+        "category": "Logging",
+        "issue": "CloudTrail Logging Disabled",
+        "severity": "LOW",
+        "pattern": "\"IsLogging\": false",
+        "detail": "Activity logging is disabled, making it impossible to audit security incidents.",
+        "remediation": "Enable CloudTrail logging for the entire organization.",
+        "nist_reference": "AU-2 (Event Logging), AU-12 (Audit Record Generation)"
+    },
+    {
+        "category": "S3",
+        "issue": "MFA Delete Disabled",
+        "severity": "LOW",
+        "pattern": "\"MFADelete\": \"Disabled\"",
+        "detail": "Buckets can be deleted without multi-factor authentication.",
+        "remediation": "Enable MFA Delete to prevent accidental or malicious data loss.",
+        "nist_reference": "IA-2 (Identification and Authentication), AC-6 (Least Privilege)"
+    },
+    {
+        "category": "Network",
+        "issue": "Open Database Port (3306)",
+        "severity": "HIGH",
+        "pattern": "\"FromPort\": 3306, \"CidrIp\": \"0.0.0.0/0\"",
+        "detail": "MySQL/Aurora database port is exposed to the public internet.",
+        "remediation": "Restrict database access to the application tier security group.",
+        "nist_reference": "SC-7 (Boundary Protection), AC-3 (Access Enforcement)"
+    },
+    {
+        "category": "IAM",
+        "issue": "PassRole Privilege Escalation",
+        "severity": "HIGH",
+        "pattern": "\"Action\": \"iam:PassRole\"",
+        "detail": "Allows a user to pass an IAM role to an AWS service, potentially escalating privileges.",
+        "remediation": "Use 'Resource' constraints to limit which roles can be passed.",
+        "nist_reference": "AC-6 (Least Privilege), AC-3 (Access Enforcement)"
+    },
+    {
+        "category": "Encryption",
+        "issue": "Insecure TLS Version",
+        "severity": "MEDIUM",
+        "pattern": "\"MinimumProtocolVersion\": \"TLSv1.0\"",
+        "detail": "TLS 1.0 is deprecated and contains known vulnerabilities.",
+        "remediation": "Upgrade minimum protocol version to TLSv1.2 or higher.",
+        "nist_reference": "SC-13 (Cryptographic Protection), SC-8 (Transmission Confidentiality and Integrity)"
+    },
+    {
+        "category": "IAM",
+        "issue": "Full S3 Access",
+        "severity": "MEDIUM",
+        "pattern": "\"Action\": \"s3:*\"",
+        "detail": "Grants complete control over all S3 buckets in the account.",
+        "remediation": "Specify only the necessary actions like s3:PutObject.",
+        "nist_reference": "AC-6 (Least Privilege), AC-3 (Access Enforcement)"
+    },
+    {
+        "category": "Network",
+        "issue": "Open Telnet Port",
+        "severity": "CRITICAL",
+        "pattern": "\"FromPort\": 23, \"CidrIp\": \"0.0.0.0/0\"",
+        "detail": "Telnet sends data in plaintext and should never be exposed.",
+        "remediation": "Disable Port 23 and use SSH instead.",
+        "nist_reference": "SC-7 (Boundary Protection), SC-8 (Transmission Confidentiality and Integrity)"
+    },
+    {
+        "category": "S3",
+        "issue": "S3 Versioning Disabled",
+        "severity": "LOW",
+        "pattern": "\"Status\": \"Suspended\"",
+        "detail": "Versioning is disabled, meaning overwritten or deleted objects cannot be recovered.",
+        "remediation": "Enable S3 Versioning to protect against accidental deletions.",
+        "nist_reference": "CP-9 (System Backup)"
+    },
+    {
+        "category": "Database",
+        "issue": "RDS Storage Unencrypted",
+        "severity": "MEDIUM",
+        "pattern": "\"StorageEncrypted\": false",
+        "detail": "Database storage volumes are not encrypted at rest.",
+        "remediation": "Enable storage encryption using AWS KMS.",
+        "nist_reference": "SC-28 (Protection of Information at Rest), SC-13 (Cryptographic Protection)"
+    },
+    {
+        "category": "Network",
+        "issue": "Open DNS Port",
+        "severity": "LOW",
+        "pattern": "\"FromPort\": 53, \"CidrIp\": \"0.0.0.0/0\"",
+        "detail": "DNS port is open to the public, which could be used for amplification attacks.",
+        "remediation": "Restrict DNS access to known resolvers.",
+        "nist_reference": "SC-7 (Boundary Protection)"
+    },
+    {
+        "category": "Encryption",
+        "issue": "EBS Volume Unencrypted",
+        "severity": "LOW",
+        "pattern": "\"Encrypted\": false",
+        "detail": "Elastic Block Store volume is not encrypted.",
+        "remediation": "Enable default EBS encryption for the account region.",
+        "nist_reference": "SC-28 (Protection of Information at Rest), SC-13 (Cryptographic Protection)"
+    },
+    {
+        "category": "IAM",
+        "issue": "Root Account Usage",
+        "severity": "CRITICAL",
+        "pattern": "\"User\": \"root\"",
+        "detail": "The root account is being used for routine tasks, which is a high security risk.",
+        "remediation": "Lock away root credentials and use IAM users with MFA.",
+        "nist_reference": "IA-2 (Identification and Authentication), AC-6 (Least Privilege)"
+    },
+    {
+        "category": "Network",
+        "issue": "Open MongoDB Port",
+        "severity": "HIGH",
+        "pattern": "\"FromPort\": 27017, \"CidrIp\": \"0.0.0.0/0\"",
+        "detail": "MongoDB port is exposed, making it vulnerable to unauthorized access.",
+        "remediation": "Restrict access to the application's private IP range.",
+        "nist_reference": "SC-7 (Boundary Protection), AC-3 (Access Enforcement)"
+    },
+    {
+        "category": "Lambda",
+        "issue": "Lambda Function Publicly Accessible",
+        "severity": "HIGH",
+        "pattern": "\"Principal\": \"*\", \"Action\": \"lambda:InvokeFunction\"",
+        "detail": "The Lambda function can be triggered by any AWS user.",
+        "remediation": "Remove the wildcard permission from the function policy.",
+        "nist_reference": "AC-3 (Access Enforcement), SC-7 (Boundary Protection)"
+    },
+    {
+        "category": "Config",
+        "issue": "Detailed Monitoring Disabled",
+        "severity": "LOW",
+        "pattern": "\"Monitoring\": \"Disabled\"",
+        "detail": "EC2 detailed monitoring is off, reducing visibility into performance spikes.",
+        "remediation": "Enable CloudWatch detailed monitoring.",
+        "nist_reference": "AU-6 (Audit Review, Analysis, and Reporting)"
+    },
+    {
+        "category": "Network",
+        "issue": "Open FTP Port",
+        "severity": "MEDIUM",
+        "pattern": "\"FromPort\": 21, \"CidrIp\": \"0.0.0.0/0\"",
+        "detail": "FTP port is open. FTP is an insecure protocol that sends credentials in cleartext.",
+        "remediation": "Use SFTP or FTPS instead.",
+        "nist_reference": "SC-7 (Boundary Protection), SC-8 (Transmission Confidentiality and Integrity)"
+    },
+    {
+        "category": "IAM",
+        "issue": "Access Key Rotation Required",
+        "severity": "LOW",
+        "pattern": "\"CreateDate\": \"2023-",
+        "detail": "The access keys were created over a year ago and should be rotated.",
+        "remediation": "Generate new keys and deactivate the old ones.",
+        "nist_reference": "IA-5 (Authenticator Management)"
+    },
+    {
+        "category": "Secrets",
+        "issue": "Hardcoded AWS Access Key",
+        "pattern": "AKIA",
+        "severity": "CRITICAL",
+        "detail": "A potential AWS Access Key ID was found in plaintext.",
+        "remediation": "Immediately rotate the key and use AWS Secrets Manager.",
+        "nist_reference": "IA-5 (Authenticator Management), SC-28 (Protection of Information at Rest)"
+    }
+]

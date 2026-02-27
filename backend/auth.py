@@ -34,26 +34,17 @@ def create_user(email: str, password: str):
     finally:
         conn.close()
 
-def authenticate_user(email: str, password:str):
-    conn = get_connection()
-    cur = conn.cursor()
+def authenticate_user(email: str, password: str):
+    # Using 'with' automatically handles closing or cleaning up
+    with get_connection() as conn:
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+        cur.execute("SELECT id, password_hash FROM users WHERE email = ?", (email,))
+        row = cur.fetchone()
 
-    cur.execute(
-        "SELECT id, password_hash FROM users WHERE email = ?",
-        (email,)
-    )
-    row = cur.fetchone()
-    conn.close()
-
-    if not row:
-        return None
-
-    user_id = row["id"]
-    password_hash = row["password_hash"]
-
-    if not verify_password(password, password_hash):
-        return None
-
-    return user_id
+    if row and verify_password(password, row["password_hash"]):
+        return row["id"]
+    
+    return None
 
 

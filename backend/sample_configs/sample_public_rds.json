@@ -1,0 +1,6 @@
+{
+    "DBInstanceIdentifier": "prod-db",
+    "Engine": "mysql",
+    "PubliclyAccessible": true,
+    "StorageEncrypted": false
+}

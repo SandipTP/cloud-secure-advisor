@@ -1,0 +1,12 @@
+"FLASK_SECRET_KEY", "qbfFX8nxn2JMMrCdP77s3GtB6CSAjmqOBAjuedqhYVFU1VbjUtXda112hj_704oy")
+
+"JWT_SECRET_KEY", "qbfFX8nxn2JMMrCdP77s3GtB6CSAjmqOBAjuedqhYVFU1VbjUtXda112hj_704oy")
+
+Groq api
+api_key="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
+
+SENDGRID_API_KEY
+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
+
+SENDGRID_FROM_EMAIL
+realmesandip@gmail.com
