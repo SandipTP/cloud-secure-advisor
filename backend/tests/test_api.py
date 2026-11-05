@@ -207,6 +207,17 @@ Statement:
         filtered_data = filtered_res.get_json()
         self.assertTrue(filtered_data["has_data"])
 
+    def test_batch_upload_file_count_cap(self):
+        headers = self._register_and_login()
+        files = [
+            (io.BytesIO(b'{"Version":"2012-10-17","Statement":[]}'), f"policy_{i}.json")
+            for i in range(21)
+        ]
+        data = {"files": files}
+        res = self.client.post("/upload/batch", data=data, content_type="multipart/form-data", headers=headers)
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("Batch upload limit exceeded", res.get_json()["error"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 import uuid
 import secrets
@@ -60,11 +61,32 @@ print("✅ Using DB:", app.config["SQLALCHEMY_DATABASE_URI"])
 jwt_secret = os.getenv("JWT_SECRET_KEY")
 flask_secret = os.getenv("FLASK_SECRET_KEY")
 
+debug_mode = os.getenv("FLASK_DEBUG", "false").lower() in ("true", "1")
+is_dev_or_test = (
+    debug_mode
+    or os.getenv("FLASK_ENV", "").lower() in ("development", "dev", "test", "testing")
+    or "pytest" in sys.modules
+    or "unittest" in sys.modules
+    or any("test" in arg.lower() for arg in sys.argv)
+    or app.config.get("TESTING", False)
+)
+
 if not jwt_secret:
-    print("[WARN] JWT_SECRET_KEY not set in environment. Using fallback development key. Set JWT_SECRET_KEY in .env for production.")
-    jwt_secret = flask_secret or "dev-insecure-jwt-secret-cloud-secure-advisor-change-in-prod"
+    if not is_dev_or_test:
+        raise RuntimeError(
+            "FATAL SECURITY CONFIGURATION: JWT_SECRET_KEY environment variable is not set. "
+            "CloudSecure Advisor refuses to start in production mode without a configured secret key. "
+            "Set JWT_SECRET_KEY in your environment or enable FLASK_DEBUG=true for local development."
+        )
+    print("[WARN] JWT_SECRET_KEY not set in environment. Generating an ephemeral random secret for development/testing.")
+    jwt_secret = flask_secret or secrets.token_hex(32)
 
 if not flask_secret:
+    if not is_dev_or_test:
+        raise RuntimeError(
+            "FATAL SECURITY CONFIGURATION: FLASK_SECRET_KEY environment variable is not set. "
+            "CloudSecure Advisor refuses to start in production mode without a configured secret key."
+        )
     flask_secret = jwt_secret
 
 app.config["SECRET_KEY"] = flask_secret
@@ -73,6 +95,7 @@ app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=6)
 
 # Upload settings
 ALLOWED_EXTENSIONS = {".json", ".yaml", ".yml"}
+MAX_BATCH_FILES = 20  # Cap maximum files per batch request to prevent denial-of-service / resource exhaustion
 raw_upload_folder = os.getenv("UPLOAD_FOLDER", "uploads")
 app.config["UPLOAD_FOLDER"] = (
     raw_upload_folder
@@ -471,6 +494,9 @@ def upload_file():
     if not files:
         return jsonify({"error": "No file provided"}), 400
 
+    if len(files) > MAX_BATCH_FILES:
+        return jsonify({"error": f"Upload limit exceeded: maximum {MAX_BATCH_FILES} files allowed per batch request."}), 400
+
     results = []
     for f in files:
         if f and f.filename:
@@ -495,6 +521,9 @@ def upload_batch():
 
     if not files:
         return jsonify({"error": "No files provided"}), 400
+
+    if len(files) > MAX_BATCH_FILES:
+        return jsonify({"error": f"Batch upload limit exceeded: maximum {MAX_BATCH_FILES} files allowed per request."}), 400
 
     results = []
     for f in files:

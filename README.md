@@ -34,6 +34,7 @@
 cloud-secure-advisor/
 ├── backend/
 │   ├── app.py                     # Main Flask application and REST endpoints
+│   ├── compliance.py              # Multi-framework compliance evaluation engine (NIST, CIS, SOC 2)
 │   ├── rules.json                 # Supplemental pattern rules
 │   ├── rules/
 │   │   ├── iam_rules.py           # Structured IAM policy rules (least privilege, admin access)
@@ -44,20 +45,19 @@ cloud-secure-advisor/
 │   ├── validate/
 │   │   └── config_validator.py    # IAM policy schema validator
 │   ├── sample_configs/            # Sample misconfigured and secure configurations
-│   ├── tests/
-│   │   └── test_api.py            # Automated test suite
-│   ├── requirements.txt           # Python dependencies
-│   └── .env.example               # Backend configuration example
+│   └── tests/
+│       └── test_api.py            # Automated test suite
 ├── frontend/
 │   ├── src/
-│   │   ├── App.jsx                # Main dashboard, router, scanner, history, and compliance
+│   │   ├── App.jsx                # Main dashboard, router, scanner, and history views
+│   │   ├── CompliancePanel.jsx    # Interactive multi-framework compliance audit panel
 │   │   ├── FindingsPage.jsx       # Detailed findings view and AISummaryPanel
 │   │   ├── LoginPage.jsx          # Sign-in, registration, and password reset flows
 │   │   └── apiConfig.js           # Centralized API endpoint configuration
 │   ├── package.json               # Frontend dependencies
-│   └── vite.config.js             # Vite configuration
-├── requirements.txt               # Root Python dependencies
-├── .env.example                   # Root environment template
+│   └── vite.config.js             # Vite configuration with API reverse proxy
+├── requirements.txt               # Python dependencies
+├── .env.example                   # Environment configuration template
 └── README.md                      # Platform documentation
 ```
 
