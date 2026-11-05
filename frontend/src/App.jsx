@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import LoginPage from "./LoginPage";
+import CompleteProfilePage from "./CompleteProfilePage";
 import FindingsPage from "./FindingsPage";
 import CompliancePanel from "./CompliancePanel";
 import SettingsPanel from "./SettingsPanel";
@@ -336,7 +337,7 @@ function exportPDF(findings, uploadInfo = "") {
 /* ============================================================
    DASHBOARD TAB
 ============================================================ */
-function DashboardTab({ allFindings, historyList }) {
+function DashboardTab({ allFindings, historyList, userProfile, onNavigateTab }) {
   const counts = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 };
   allFindings.forEach(f => {
     const k = f.severity?.toUpperCase();
@@ -356,8 +357,89 @@ function DashboardTab({ allFindings, historyList }) {
     ? Math.round(historyList.reduce((s, r) => s + (r.score ?? 100), 0) / historyList.length)
     : 100;
 
+  const fullName = [userProfile?.first_name, userProfile?.last_name].filter(Boolean).join(" ");
+  const greetingName = fullName || userProfile?.email?.split("@")[0] || "there";
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+      {/* Welcome Banner */}
+      <div className="fade-up" style={{
+        background: `linear-gradient(135deg, ${G.card}, #131d33)`,
+        border: `1px solid ${G.border}`,
+        borderRadius: "14px",
+        padding: "22px 26px",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        flexWrap: "wrap",
+        gap: "16px",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+          <div style={{
+            width: 48,
+            height: 48,
+            borderRadius: "12px",
+            background: `linear-gradient(135deg, ${G.accent}25, ${G.purple}25)`,
+            border: `1px solid ${G.accent}45`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: "24px",
+          }}>
+            👋
+          </div>
+          <div>
+            <div style={{ fontSize: "20px", fontWeight: 700, color: G.text }}>
+              Welcome back, {greetingName}!
+            </div>
+            <div style={{ fontSize: "13px", color: G.muted, marginTop: "4px" }}>
+              Here is your cloud security posture overview and compliance alignment today.
+            </div>
+          </div>
+        </div>
+
+        {!userProfile?.first_name ? (
+          <button
+            onClick={() => onNavigateTab && onNavigateTab("settings")}
+            style={{
+              background: `${G.accent}14`,
+              color: G.accent,
+              border: `1px solid ${G.accent}44`,
+              borderRadius: "8px",
+              padding: "8px 16px",
+              fontSize: "12px",
+              fontFamily: G.fontDisplay,
+              fontWeight: 600,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              transition: "all 0.2s",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = `${G.accent}25`; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = `${G.accent}14`; }}
+          >
+            <span>✎</span> Complete Your Profile →
+          </button>
+        ) : (
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            background: G.surface,
+            border: `1px solid ${G.border}`,
+            borderRadius: "8px",
+            padding: "6px 12px",
+            fontSize: "12px",
+            color: G.muted,
+            fontFamily: G.font,
+          }}>
+            <span style={{ width: 8, height: 8, borderRadius: "50%", background: G.green }} />
+            Profile Complete
+          </div>
+        )}
+      </div>
+
       {/* Stat row */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "16px" }}>
         <StatCard label="Total Issues" value={allFindings.length} icon="⚠" color={G.text} delay={0} />
@@ -666,22 +748,26 @@ function UploadManager({ handleLogout }) {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [allFindings, setAllFindings] = useState([]);
   const [historyList, setHistoryList] = useState([]);
+  const [userProfile, setUserProfile] = useState(null);
   const [loadingData, setLoadingData] = useState(true);
 
   useEffect(() => { injectGlobalStyles(); }, []);
 
-  // Centralized data loading: fetches history & findings on mount
+  // Centralized data loading: fetches history, findings, and profile on mount
   const loadUserData = useCallback(async () => {
     const token = localStorage.getItem("token");
     if (!token) return;
 
     try {
       setLoadingData(true);
-      const [histRes, findRes] = await Promise.all([
+      const [histRes, findRes, profileRes] = await Promise.all([
         fetch(`${API_BASE_URL}/history`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
         fetch(`${API_BASE_URL}/findings`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        fetch(`${API_BASE_URL}/account`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
       ]);
@@ -693,6 +779,10 @@ function UploadManager({ handleLogout }) {
       if (findRes.ok) {
         const findData = await findRes.json();
         setAllFindings(Array.isArray(findData) ? findData : []);
+      }
+      if (profileRes.ok) {
+        const profileData = await profileRes.json();
+        setUserProfile(profileData);
       }
     } catch (e) {
       console.error("Failed to load user scans", e);
@@ -740,7 +830,12 @@ function UploadManager({ handleLogout }) {
         </div>
 
         {activeTab === "dashboard" && (
-          <DashboardTab allFindings={allFindings} historyList={historyList} />
+          <DashboardTab
+            allFindings={allFindings}
+            historyList={historyList}
+            userProfile={userProfile}
+            onNavigateTab={setActiveTab}
+          />
         )}
         {activeTab === "scan" && (
           <ScanTab onScanComplete={handleScanComplete} />
@@ -761,7 +856,11 @@ function UploadManager({ handleLogout }) {
           />
         )}
         {activeTab === "settings" && (
-          <SettingsPanel onLogout={handleLogout} />
+          <SettingsPanel
+            onLogout={handleLogout}
+            onProfileUpdated={(updated) => setUserProfile(prev => ({ ...prev, ...updated }))}
+            onEmailUpdated={(newEmail) => setUserProfile(prev => ({ ...prev, email: newEmail }))}
+          />
         )}
       </main>
     </div>
@@ -777,11 +876,11 @@ export default function App() {
 
   useEffect(() => { injectGlobalStyles(); }, []);
 
-  const updateToken = (newToken) => {
+  const updateToken = (newToken, redirectPath = "/") => {
     if (newToken) {
       localStorage.setItem("token", newToken);
       setToken(newToken);
-      navigate("/");
+      navigate(redirectPath);
     } else {
       localStorage.removeItem("token");
       setToken(null);
@@ -799,6 +898,7 @@ export default function App() {
       <Route path="/login" element={!token ? <LoginPage mode="signin" onLoginSuccess={updateToken} /> : <Navigate to="/" />} />
       <Route path="/register" element={!token ? <LoginPage mode="register" onLoginSuccess={updateToken} /> : <Navigate to="/" />} />
       <Route path="/forgot-password" element={<LoginPage mode="forgot" />} />
+      <Route path="/complete-profile" element={token ? <CompleteProfilePage onProfileSaved={() => navigate("/")} /> : <Navigate to="/login" />} />
       <Route path="/" element={token ? <UploadManager handleLogout={handleLogout} /> : <Navigate to="/login" />} />
       <Route path="/findings/:uploadId" element={token ? <FindingsPage /> : <Navigate to="/login" />} />
       <Route path="*" element={<Navigate to="/" />} />

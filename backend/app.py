@@ -143,6 +143,10 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(120), unique=True, nullable=False, index=True)
     password_hash = db.Column(db.String(255), nullable=False)
+    first_name = db.Column(db.String(80), nullable=True)
+    last_name = db.Column(db.String(80), nullable=True)
+    dob = db.Column(db.String(20), nullable=True)
+    phone = db.Column(db.String(30), nullable=True)
     created_at = db.Column(db.Text, default=lambda: datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"))
 
     uploads = db.relationship(
@@ -198,9 +202,28 @@ class PasswordResetToken(db.Model):
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
 
+def ensure_user_columns():
+    """Ensures SQLite users table has profile columns without requiring manual schema drops."""
+    try:
+        with db.engine.connect() as conn:
+            cols = [row[1] for row in conn.execute(db.text("PRAGMA table_info(users)")).fetchall()]
+            for col_name, col_type in [
+                ("first_name", "VARCHAR(80)"),
+                ("last_name", "VARCHAR(80)"),
+                ("dob", "VARCHAR(20)"),
+                ("phone", "VARCHAR(30)"),
+            ]:
+                if col_name not in cols:
+                    conn.execute(db.text(f"ALTER TABLE users ADD COLUMN {col_name} {col_type}"))
+            conn.commit()
+    except Exception as e:
+        print("[WARN] Error ensuring user profile columns:", e)
+
+
 # Initialize tables on startup and ensure self-healing before requests
 with app.app_context():
     db.create_all()
+    ensure_user_columns()
 
 _db_initialized = False
 
@@ -210,6 +233,7 @@ def ensure_database_ready():
     if not _db_initialized:
         try:
             db.create_all()
+            ensure_user_columns()
             _db_initialized = True
         except Exception as e:
             print("[WARN] Error ensuring database tables exist:", e)
@@ -218,7 +242,14 @@ def ensure_database_ready():
 # ============================================================
 # Auth Helpers
 # ============================================================
-def create_user(email: str, password: str) -> bool:
+def create_user(
+    email: str,
+    password: str,
+    first_name: str = None,
+    last_name: str = None,
+    dob: str = None,
+    phone: str = None,
+) -> bool:
     existing = User.query.filter_by(email=email).first()
     if existing:
         return False
@@ -227,6 +258,10 @@ def create_user(email: str, password: str) -> bool:
     user = User(
         email=email,
         password_hash=pw_hash,
+        first_name=(first_name or "").strip() or None,
+        last_name=(last_name or "").strip() or None,
+        dob=(dob or "").strip() or None,
+        phone=(phone or "").strip() or None,
         created_at=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     )
     db.session.add(user)
@@ -384,6 +419,10 @@ def signup():
     data = request.get_json(silent=True) or {}
     email = (data.get("email") or "").strip().lower()
     password = data.get("password") or ""
+    first_name = data.get("first_name") or None
+    last_name = data.get("last_name") or None
+    dob = data.get("dob") or None
+    phone = data.get("phone") or None
 
     if not email or not password:
         return jsonify({"error": "Email and password required"}), 400
@@ -391,10 +430,31 @@ def signup():
     if len(password) < 8:
         return jsonify({"error": "Password must be at least 8 characters"}), 400
 
-    if not create_user(email, password):
+    if not create_user(
+        email=email,
+        password=password,
+        first_name=first_name,
+        last_name=last_name,
+        dob=dob,
+        phone=phone,
+    ):
         return jsonify({"error": "User already exists"}), 409
 
-    return jsonify({"message": "User created successfully"}), 201
+    user = User.query.filter_by(email=email).first()
+    token = create_access_token(identity=str(user.id))
+
+    return jsonify({
+        "message": "User created successfully",
+        "access_token": token,
+        "user": {
+            "id": user.id,
+            "email": user.email,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "dob": user.dob,
+            "phone": user.phone,
+        }
+    }), 201
 
 
 @app.route("/login", methods=["POST"])
@@ -436,6 +496,10 @@ def get_account_profile():
     return jsonify({
         "id": user.id,
         "email": user.email,
+        "first_name": user.first_name or "",
+        "last_name": user.last_name or "",
+        "dob": user.dob or "",
+        "phone": user.phone or "",
         "created_at": user.created_at,
         "total_scans": scans_count,
         "total_findings": findings_count,
@@ -451,13 +515,30 @@ def update_account_profile():
         return jsonify({"error": "User account not found"}), 404
 
     data = request.get_json(silent=True) or {}
-    new_email = (data.get("email") or "").strip().lower()
+    new_email = (data.get("email") or "").strip().lower() if "email" in data else None
     current_password = data.get("current_password") or ""
     new_password = data.get("new_password") or ""
 
     updated_fields = []
 
-    # Update email
+    # Update personal profile fields
+    if "first_name" in data:
+        user.first_name = (data.get("first_name") or "").strip() or None
+        updated_fields.append("first_name")
+
+    if "last_name" in data:
+        user.last_name = (data.get("last_name") or "").strip() or None
+        updated_fields.append("last_name")
+
+    if "dob" in data:
+        user.dob = (data.get("dob") or "").strip() or None
+        updated_fields.append("dob")
+
+    if "phone" in data:
+        user.phone = (data.get("phone") or "").strip() or None
+        updated_fields.append("phone")
+
+    # Update email (requires current password verification)
     if new_email and new_email != user.email.lower():
         if "@" not in new_email or "." not in new_email:
             return jsonify({"error": "Please provide a valid email address"}), 400
@@ -473,7 +554,7 @@ def update_account_profile():
         user.email = new_email
         updated_fields.append("email")
 
-    # Update password
+    # Update password (requires current password verification)
     if new_password:
         if not current_password or not verify_password(user.password_hash, current_password):
             return jsonify({"error": "Current password is required to set a new password"}), 401
@@ -488,12 +569,31 @@ def update_account_profile():
         updated_fields.append("password")
 
     if not updated_fields:
-        return jsonify({"message": "No changes requested", "email": user.email}), 200
+        return jsonify({
+            "message": "No changes requested",
+            "email": user.email,
+            "profile": {
+                "id": user.id,
+                "email": user.email,
+                "first_name": user.first_name or "",
+                "last_name": user.last_name or "",
+                "dob": user.dob or "",
+                "phone": user.phone or "",
+            }
+        }), 200
 
     db.session.commit()
     return jsonify({
-        "message": f"Account {', '.join(updated_fields)} successfully updated.",
+        "message": f"Account profile successfully updated ({', '.join(updated_fields)}).",
         "email": user.email,
+        "profile": {
+            "id": user.id,
+            "email": user.email,
+            "first_name": user.first_name or "",
+            "last_name": user.last_name or "",
+            "dob": user.dob or "",
+            "phone": user.phone or "",
+        },
         "updated_fields": updated_fields,
     }), 200
 

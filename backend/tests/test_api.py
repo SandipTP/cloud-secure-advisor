@@ -302,6 +302,58 @@ Statement:
         )
         self.assertEqual(login_after_del.status_code, 401)
 
+    def test_personal_profile_complete_page_and_settings(self):
+        # 1. New user signup returns access_token and empty profile fields
+        signup_res = self.client.post(
+            "/signup",
+            json={"email": "newbie@example.com", "password": "securepassword123"}
+        )
+        self.assertEqual(signup_res.status_code, 201)
+        signup_json = signup_res.get_json()
+        self.assertIn("access_token", signup_json)
+        self.assertEqual(signup_json["user"]["email"], "newbie@example.com")
+        self.assertIsNone(signup_json["user"]["first_name"])
+
+        headers = {"Authorization": f"Bearer {signup_json['access_token']}"}
+
+        # 2. Complete Profile Page flow: PUT /account with personal details (no password needed)
+        comp_res = self.client.put(
+            "/account",
+            json={
+                "first_name": "Ada",
+                "last_name": "Lovelace",
+                "dob": "1815-12-10",
+                "phone": "+1-800-555-0199",
+            },
+            headers=headers
+        )
+        self.assertEqual(comp_res.status_code, 200)
+        profile_data = comp_res.get_json()["profile"]
+        self.assertEqual(profile_data["first_name"], "Ada")
+        self.assertEqual(profile_data["last_name"], "Lovelace")
+        self.assertEqual(profile_data["dob"], "1815-12-10")
+        self.assertEqual(profile_data["phone"], "+1-800-555-0199")
+
+        # 3. GET /account returns complete profile details
+        get_res = self.client.get("/account", headers=headers)
+        self.assertEqual(get_res.status_code, 200)
+        account = get_res.get_json()
+        self.assertEqual(account["first_name"], "Ada")
+        self.assertEqual(account["last_name"], "Lovelace")
+        self.assertEqual(account["dob"], "1815-12-10")
+        self.assertEqual(account["phone"], "+1-800-555-0199")
+
+        # 4. Settings Page update: update only phone number
+        edit_res = self.client.put(
+            "/account",
+            json={"phone": "+1-800-555-9999"},
+            headers=headers
+        )
+        self.assertEqual(edit_res.status_code, 200)
+        updated_profile = edit_res.get_json()["profile"]
+        self.assertEqual(updated_profile["first_name"], "Ada")
+        self.assertEqual(updated_profile["phone"], "+1-800-555-9999")
+
 
 if __name__ == "__main__":
     unittest.main()

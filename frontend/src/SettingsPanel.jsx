@@ -19,11 +19,18 @@ const G = {
   fontDisplay: "'Space Grotesk', sans-serif",
 };
 
-export default function SettingsPanel({ onLogout, onEmailUpdated }) {
+export default function SettingsPanel({ onLogout, onEmailUpdated, onProfileUpdated }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+
+  // Personal Info form state
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [dob, setDob] = useState("");
+  const [phone, setPhone] = useState("");
+  const [updatingProfile, setUpdatingProfile] = useState(false);
 
   // Email form state
   const [newEmail, setNewEmail] = useState("");
@@ -56,6 +63,10 @@ export default function SettingsPanel({ onLogout, onEmailUpdated }) {
         if (!res.ok) throw new Error(data.error || "Failed to load profile");
         setProfile(data);
         setNewEmail(data.email || "");
+        setFirstName(data.first_name || "");
+        setLastName(data.last_name || "");
+        setDob(data.dob || "");
+        setPhone(data.phone || "");
       } catch (err) {
         setError(err.message);
       } finally {
@@ -64,6 +75,56 @@ export default function SettingsPanel({ onLogout, onEmailUpdated }) {
     }
     loadProfile();
   }, [token]);
+
+  // Handle personal profile update
+  const handleUpdateProfile = async (e) => {
+    e.preventDefault();
+    setError(null);
+    setSuccess(null);
+
+    if (!firstName.trim() && !lastName.trim() && !dob && !phone.trim()) {
+      setError("Please fill out at least one profile field to update.");
+      return;
+    }
+
+    try {
+      setUpdatingProfile(true);
+      const res = await fetch(`${API_BASE_URL}/account`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
+          dob: dob || null,
+          phone: phone.trim() || null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to update personal details");
+
+      const updated = data.profile || {
+        ...profile,
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
+        dob: dob || "",
+        phone: phone.trim() || "",
+      };
+
+      setProfile(prev => ({
+        ...prev,
+        ...updated,
+      }));
+      setSuccess("Personal profile details successfully updated!");
+      if (onProfileUpdated) onProfileUpdated(updated);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setUpdatingProfile(false);
+    }
+  };
 
   // Handle email update
   const handleUpdateEmail = async (e) => {
@@ -194,6 +255,8 @@ export default function SettingsPanel({ onLogout, onEmailUpdated }) {
     );
   }
 
+  const fullName = [profile?.first_name, profile?.last_name].filter(Boolean).join(" ");
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "24px", maxWidth: "900px" }}>
       {/* Notifications */}
@@ -229,17 +292,17 @@ export default function SettingsPanel({ onLogout, onEmailUpdated }) {
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: "18px" }}>
           <div style={{
-            width: 54, height: 54, borderRadius: "14px",
+            width: 56, height: 56, borderRadius: "14px",
             background: `linear-gradient(135deg, ${G.accent}33, ${G.purple}33)`,
             border: `1px solid ${G.accent}55`, display: "flex", alignItems: "center",
-            justifyContent: "center", fontSize: "24px", color: G.accent,
+            justifyContent: "center", fontSize: "26px", color: G.accent,
           }}>
             👤
           </div>
           <div>
-            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-              <h2 style={{ fontSize: "18px", fontWeight: 700, color: G.text, margin: 0 }}>
-                {profile?.email || "Account User"}
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+              <h2 style={{ fontSize: "19px", fontWeight: 700, color: G.text, margin: 0 }}>
+                {fullName || profile?.email || "Account User"}
               </h2>
               <span style={{
                 background: `${G.accent}14`, color: G.accent, border: `1px solid ${G.accent}33`,
@@ -248,8 +311,25 @@ export default function SettingsPanel({ onLogout, onEmailUpdated }) {
                 USER #{profile?.id || "—"}
               </span>
             </div>
-            <div style={{ fontSize: "12px", color: G.muted, marginTop: "4px", fontFamily: G.fontDisplay }}>
-              Member since: {profile?.created_at || "Recent"} &bull; Authentication: Salted Bcrypt &bull; JWT Auth
+            {fullName && (
+              <div style={{ fontSize: "13px", color: G.accent, marginTop: "2px", fontFamily: G.font }}>
+                {profile?.email}
+              </div>
+            )}
+            <div style={{ display: "flex", gap: "12px", alignItems: "center", marginTop: "6px", flexWrap: "wrap", fontSize: "12px", color: G.muted }}>
+              <span>Member since: {profile?.created_at?.split(" ")[0] || "Recent"}</span>
+              {profile?.dob && (
+                <>
+                  <span>&bull;</span>
+                  <span>DOB: {profile.dob}</span>
+                </>
+              )}
+              {profile?.phone && (
+                <>
+                  <span>&bull;</span>
+                  <span>Phone: {profile.phone}</span>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -269,6 +349,113 @@ export default function SettingsPanel({ onLogout, onEmailUpdated }) {
             <div style={{ fontSize: "11px", color: G.muted }}>Findings Detected</div>
           </div>
         </div>
+      </div>
+
+      {/* Personal Information Form Card */}
+      <div style={{
+        background: G.card, border: `1px solid ${G.border}`, borderRadius: "14px",
+        padding: "24px", display: "flex", flexDirection: "column", gap: "18px",
+      }}>
+        <div>
+          <div style={{ fontSize: "16px", fontWeight: 700, color: G.text, marginBottom: "4px" }}>
+            Personal Information
+          </div>
+          <div style={{ fontSize: "12px", color: G.muted }}>
+            Update your profile details, date of birth, and contact phone number.
+          </div>
+        </div>
+
+        <form onSubmit={handleUpdateProfile} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+          {/* Row 1: First Name & Last Name */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+            <div>
+              <label style={{ display: "block", fontSize: "12px", color: G.muted, marginBottom: "6px" }}>
+                First Name
+              </label>
+              <input
+                type="text"
+                value={firstName}
+                onChange={e => setFirstName(e.target.value)}
+                placeholder="First Name"
+                style={{
+                  width: "100%", background: G.surface, border: `1px solid ${G.border}`,
+                  borderRadius: "8px", padding: "10px 14px", color: G.text,
+                  fontSize: "13px", fontFamily: G.fontDisplay, outline: "none",
+                }}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: "block", fontSize: "12px", color: G.muted, marginBottom: "6px" }}>
+                Last Name
+              </label>
+              <input
+                type="text"
+                value={lastName}
+                onChange={e => setLastName(e.target.value)}
+                placeholder="Last Name"
+                style={{
+                  width: "100%", background: G.surface, border: `1px solid ${G.border}`,
+                  borderRadius: "8px", padding: "10px 14px", color: G.text,
+                  fontSize: "13px", fontFamily: G.fontDisplay, outline: "none",
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Row 2: Date of Birth & Phone */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+            <div>
+              <label style={{ display: "block", fontSize: "12px", color: G.muted, marginBottom: "6px" }}>
+                Date of Birth
+              </label>
+              <input
+                type="date"
+                value={dob}
+                onChange={e => setDob(e.target.value)}
+                style={{
+                  width: "100%", background: G.surface, border: `1px solid ${G.border}`,
+                  borderRadius: "8px", padding: "10px 14px", color: G.text,
+                  fontSize: "13px", fontFamily: G.fontDisplay, outline: "none",
+                  colorScheme: "dark",
+                }}
+              />
+            </div>
+
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+                <label style={{ fontSize: "12px", color: G.muted }}>
+                  Phone Number
+                </label>
+                <span style={{ fontSize: "11px", color: G.muted, fontStyle: "italic" }}>
+                  Optional
+                </span>
+              </div>
+              <input
+                type="tel"
+                value={phone}
+                onChange={e => setPhone(e.target.value)}
+                placeholder="+1 (555) 000-0000"
+                style={{
+                  width: "100%", background: G.surface, border: `1px solid ${G.border}`,
+                  borderRadius: "8px", padding: "10px 14px", color: G.text,
+                  fontSize: "13px", fontFamily: G.fontDisplay, outline: "none",
+                }}
+              />
+            </div>
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "4px" }}>
+            <button
+              type="submit"
+              disabled={updatingProfile}
+              className="btn-primary"
+              style={{ minWidth: "150px" }}
+            >
+              {updatingProfile ? "Saving Details..." : "Save Profile Details"}
+            </button>
+          </div>
+        </form>
       </div>
 
       {/* Grid: Edit Email & Change Password */}
@@ -520,4 +707,3 @@ export default function SettingsPanel({ onLogout, onEmailUpdated }) {
     </div>
   );
 }
-

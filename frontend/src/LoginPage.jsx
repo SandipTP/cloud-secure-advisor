@@ -65,8 +65,14 @@ export default function LoginPage({ onLoginSuccess, mode = "signin" }) {
             if (!response.ok) throw new Error(data.error || "Action failed");
 
             if (mode === "register") {
-                setSuccessMsg("Account created! Redirecting to login...");
-                setTimeout(() => navigate("/login"), 1500);
+                setSuccessMsg("Account created! Directing you to complete your profile...");
+                setTimeout(() => {
+                    if (data.access_token && onLoginSuccess) {
+                        onLoginSuccess(data.access_token, "/complete-profile");
+                    } else {
+                        navigate("/login");
+                    }
+                }, 700);
             } else if (mode === "forgot") {
                 setSuccessMsg("Password reset successfully! Redirecting to login...");
                 setTimeout(() => navigate("/login"), 1500);
