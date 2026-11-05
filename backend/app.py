@@ -45,8 +45,13 @@ CORS(
 )
 
 # Database
-DB_PATH = os.path.join(BASE_DIR, "cloudscanner.db")
-app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL", f"sqlite:///{DB_PATH}")
+raw_db_url = os.getenv("DATABASE_URL")
+if raw_db_url:
+    app.config["SQLALCHEMY_DATABASE_URI"] = raw_db_url
+else:
+    DB_PATH = os.path.join(BASE_DIR, "cloudscanner.db")
+    app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{DB_PATH}"
+
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 print("✅ Using DB:", app.config["SQLALCHEMY_DATABASE_URI"])
 
@@ -67,7 +72,12 @@ app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=6)
 
 # Upload settings
 ALLOWED_EXTENSIONS = {".json", ".yaml", ".yml"}
-app.config["UPLOAD_FOLDER"] = os.getenv("UPLOAD_FOLDER", os.path.join(BASE_DIR, "uploads"))
+raw_upload_folder = os.getenv("UPLOAD_FOLDER", "uploads")
+app.config["UPLOAD_FOLDER"] = (
+    raw_upload_folder
+    if os.path.isabs(raw_upload_folder)
+    else os.path.join(BASE_DIR, raw_upload_folder)
+)
 app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # 10 MB max upload
 os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
