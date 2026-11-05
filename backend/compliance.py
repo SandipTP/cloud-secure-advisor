@@ -487,3 +487,4 @@ def evaluate_compliance(findings: List[Dict[str, Any]], has_scans: bool = True) 
         "message": "All scanned files evaluated successfully." if len(findings) == 0 else f"{len(findings)} findings evaluated across compliance frameworks.",
         "frameworks": frameworks_out,
     }
+
