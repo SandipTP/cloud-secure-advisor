@@ -2,7 +2,16 @@ import os
 import sys
 import json
 import io
+import tempfile
 import unittest
+
+# Isolate test database from development / production database
+TEST_DB_PATH = os.path.join(tempfile.gettempdir(), f"csa_test_{os.getpid()}.db")
+os.environ["DATABASE_URL"] = f"sqlite:///{TEST_DB_PATH}"
+os.environ["FLASK_TESTING"] = "true"
+os.environ["FLASK_DEBUG"] = "true"
+os.environ["JWT_SECRET_KEY"] = "test-jwt-secret-key-for-unit-tests"
+os.environ["FLASK_SECRET_KEY"] = "test-flask-secret-key-for-unit-tests"
 
 # Add backend to path
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -12,9 +21,16 @@ from app import app, db, User, Upload, Finding, PasswordResetToken
 
 
 class CloudSecureAdvisorTestCase(unittest.TestCase):
+    @classmethod
+    def tearDownClass(cls):
+        if os.path.exists(TEST_DB_PATH):
+            try:
+                os.remove(TEST_DB_PATH)
+            except Exception:
+                pass
+
     def setUp(self):
         app.config["TESTING"] = True
-        app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
         self.client = app.test_client()
         with app.app_context():
             db.create_all()

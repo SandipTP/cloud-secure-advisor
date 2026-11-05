@@ -520,3 +520,4 @@ export default function SettingsPanel({ onLogout, onEmailUpdated }) {
     </div>
   );
 }
+

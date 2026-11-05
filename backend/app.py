@@ -49,7 +49,14 @@ CORS(
 # Database
 raw_db_url = os.getenv("DATABASE_URL")
 if raw_db_url:
-    app.config["SQLALCHEMY_DATABASE_URI"] = raw_db_url
+    # If a relative SQLite path like sqlite:///cloudscanner.db is supplied,
+    # resolve it to BASE_DIR so it always points to the exact same file
+    # regardless of which working directory Flask is started from.
+    if raw_db_url.startswith("sqlite:///") and not os.path.isabs(raw_db_url[10:]):
+        rel_name = raw_db_url[10:]
+        app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{os.path.join(BASE_DIR, rel_name)}"
+    else:
+        app.config["SQLALCHEMY_DATABASE_URI"] = raw_db_url
 else:
     DB_PATH = os.path.join(BASE_DIR, "cloudscanner.db")
     app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{DB_PATH}"
@@ -191,9 +198,21 @@ class PasswordResetToken(db.Model):
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
 
-# Initialize tables on startup so a fresh database is created without manual migrations
+# Initialize tables on startup and ensure self-healing before requests
 with app.app_context():
     db.create_all()
+
+_db_initialized = False
+
+@app.before_request
+def ensure_database_ready():
+    global _db_initialized
+    if not _db_initialized:
+        try:
+            db.create_all()
+            _db_initialized = True
+        except Exception as e:
+            print("[WARN] Error ensuring database tables exist:", e)
 
 
 # ============================================================
