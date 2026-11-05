@@ -156,6 +156,57 @@ Statement:
             self.assertIsNotNone(token)
             self.assertEqual(len(token.code_hash), 64)  # SHA-256
 
+    def test_compliance_endpoint_empty_and_evaluated(self):
+        headers = self._register_and_login()
+
+        # 1. When no uploads exist, compliance returns has_data: False and score: 0
+        empty_res = self.client.get("/compliance", headers=headers)
+        self.assertEqual(empty_res.status_code, 200)
+        empty_data = empty_res.get_json()
+        self.assertFalse(empty_data["has_data"])
+        self.assertEqual(empty_data["overall_score"], 0)
+        self.assertIn("nist_800_53", empty_data["frameworks"])
+        self.assertEqual(empty_data["frameworks"]["nist_800_53"]["total_controls"], 13)
+
+        # 2. Upload policy with wildcard permissions
+        sample_iam = {
+            "Version": "2012-10-17",
+            "Statement": [{"Effect": "Allow", "Action": "*", "Resource": "*"}]
+        }
+        data = {
+            "files": (io.BytesIO(json.dumps(sample_iam).encode("utf-8")), "admin_role.json")
+        }
+        up_res = self.client.post("/upload/batch", data=data, content_type="multipart/form-data", headers=headers)
+        self.assertEqual(up_res.status_code, 200)
+        upload_id = up_res.get_json()["results"][0]["upload_id"]
+
+        # 3. Compliance now has data and evaluates failures
+        comp_res = self.client.get("/compliance", headers=headers)
+        self.assertEqual(comp_res.status_code, 200)
+        comp_data = comp_res.get_json()
+        self.assertTrue(comp_data["has_data"])
+
+        nist = comp_data["frameworks"]["nist_800_53"]
+        self.assertGreater(nist["failing_controls"], 0)
+        failing_ids = [c["id"] for c in nist["controls"] if c["status"] == "FAIL"]
+        self.assertIn("AC-3", failing_ids)
+        self.assertIn("AC-6", failing_ids)
+
+        cis = comp_data["frameworks"]["cis_aws_benchmark"]
+        cis_failing = [c["id"] for c in cis["controls"] if c["status"] == "FAIL"]
+        self.assertIn("CIS 1.16", cis_failing)
+
+        soc2 = comp_data["frameworks"]["soc2_type_ii"]
+        soc2_failing = [c["id"] for c in soc2["controls"] if c["status"] == "FAIL"]
+        self.assertIn("CC6.1", soc2_failing)
+        self.assertIn("CC6.3", soc2_failing)
+
+        # 4. Filter by upload_id
+        filtered_res = self.client.get(f"/compliance?upload_id={upload_id}", headers=headers)
+        self.assertEqual(filtered_res.status_code, 200)
+        filtered_data = filtered_res.get_json()
+        self.assertTrue(filtered_data["has_data"])
+
 
 if __name__ == "__main__":
     unittest.main()

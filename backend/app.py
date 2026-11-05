@@ -30,8 +30,9 @@ try:
 except ImportError:
     pass
 
-# Import structured scanner
+# Import structured scanner and compliance engine
 from ingest.parser import parse_config, PENALTY
+from compliance import evaluate_compliance
 
 
 # App + Config
@@ -607,6 +608,55 @@ def get_all_user_findings():
         }
         for f in findings
     ]), 200
+
+
+@app.route("/compliance", methods=["GET"])
+@jwt_required()
+def get_compliance():
+    """
+    Evaluates compliance against NIST SP 800-53, CIS AWS Foundations Benchmark,
+    and SOC 2 Type II across all scans or for a specific upload_id.
+    """
+    user_id = int(get_jwt_identity())
+    upload_id = request.args.get("upload_id")
+
+    if upload_id:
+        try:
+            up_id_int = int(upload_id)
+        except ValueError:
+            return jsonify({"error": "Invalid upload_id parameter"}), 400
+
+        upload = Upload.query.filter_by(id=up_id_int, user_id=user_id).first()
+        if not upload:
+            return jsonify({"error": "Upload not found or unauthorized"}), 404
+        uploads = [upload]
+        findings = Finding.query.filter_by(upload_id=upload.id).all()
+    else:
+        uploads = Upload.query.filter_by(user_id=user_id).all()
+        upload_ids = [u.id for u in uploads]
+        if not upload_ids:
+            return jsonify(evaluate_compliance([], has_scans=False)), 200
+        findings = Finding.query.filter(Finding.upload_id.in_(upload_ids)).all()
+
+    upload_map = {u.id: u.filename for u in uploads}
+    finding_dicts = [
+        {
+            "id": f.id,
+            "upload_id": f.upload_id,
+            "filename": upload_map.get(f.upload_id, ""),
+            "category": f.category,
+            "issue": f.issue,
+            "severity": f.severity,
+            "detail": f.detail,
+            "remediation": f.remediation,
+            "nist_reference": f.nist_reference,
+            "created_at": f.created_at,
+        }
+        for f in findings
+    ]
+
+    result = evaluate_compliance(finding_dicts, has_scans=len(uploads) > 0)
+    return jsonify(result), 200
 
 
 # ============================================================
