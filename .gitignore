@@ -30,25 +30,32 @@ env/
 *.sqlite
 *.sqlite3
 instance/
+backend/instance/
+
+# Local Utilities & Binaries
+sqlite3.exe
+sqlite3
 
 # Uploads & Runtime files
 backend/uploads/*
 !backend/uploads/.gitkeep
-uploads/*
-!uploads/.gitkeep
+uploads/
 
 # Node / Frontend
 node_modules/
+dist/
 frontend/dist/
 frontend/dist-ssr/
+backend/dist/
 frontend/.env.local
 frontend/.env.*.local
 
-# Secrets & Environment configs
+# Secrets & Local Notes
 .env
 .env.*
 !.env.example
 backend/.env
+Notes/
 
 # OS / Editor files
 .DS_Store
