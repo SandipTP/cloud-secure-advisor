@@ -1,6 +1,6 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import axios from "axios";
+import { API_BASE_URL } from "./apiConfig";
 
 /* ============================================================
    DESIGN TOKENS
@@ -30,42 +30,13 @@ const SEV_CONFIG = {
 };
 
 /* ============================================================
-   INJECT STYLES
-============================================================ */
-function injectStyles() {
-    if (document.getElementById("findings-styles")) return;
-    const s = document.createElement("style");
-    s.id = "findings-styles";
-    s.textContent = `
-    @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
-    *, *::before, *::after { box-sizing: border-box; }
-    body { background: ${G.bg}; color: ${G.text}; font-family: ${G.fontDisplay}; margin: 0; }
-    @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .btn-primary { background: linear-gradient(135deg,${G.accent},#0ea5c9); color:#000; border:none; border-radius:8px; padding:9px 18px; font-family:${G.fontDisplay}; font-weight:600; font-size:13px; cursor:pointer; transition:opacity .2s; white-space:nowrap; }
-    .btn-primary:hover { opacity:.85; }
-    .btn-primary:disabled { opacity:.4; cursor:not-allowed; }
-    .btn-ghost { background:transparent; color:${G.muted}; border:1px solid ${G.border}; border-radius:7px; padding:8px 14px; font-family:${G.fontDisplay}; font-size:13px; cursor:pointer; transition:color .15s,border-color .15s; white-space:nowrap; }
-    .btn-ghost:hover { color:${G.text}; border-color:${G.muted}; }
-    .filter-btn { background:transparent; border:1px solid ${G.border}; border-radius:6px; padding:6px 12px; font-family:${G.font}; font-size:11px; cursor:pointer; transition:all .15s; color:${G.muted}; }
-    .filter-btn.active { color:${G.accent}; background:${G.accent}12; }
-    select { background:${G.card}; border:1px solid ${G.border}; color:${G.text}; border-radius:7px; padding:7px 12px; font-family:${G.fontDisplay}; font-size:13px; cursor:pointer; outline:none; }
-    ::-webkit-scrollbar { width:5px; } ::-webkit-scrollbar-track { background:${G.bg}; } ::-webkit-scrollbar-thumb { background:${G.border}; border-radius:3px; }
-    .ai-body strong { color:${G.text}; font-weight:700; }
-    .ai-body code { background:${G.border}; border-radius:4px; padding:1px 6px; font-size:12px; font-family:${G.font}; color:${G.accent}; }
-    .ai-body ul { margin:6px 0 6px 20px; padding:0; }
-    .ai-body li { font-size:13px; color:#cbd5e1; line-height:1.7; margin-bottom:4px; }
-  `;
-    document.head.appendChild(s);
-}
-
-/* ============================================================
    MARKDOWN → REACT PARSER
-   Handles: **bold**, `code`, [link](url) → text only,
-            numbered sections, bullet lists, plain text.
+   Handles: **bold**, `code`, numbered sections, bullet lists.
 ============================================================ */
 function parseMarkdown(raw) {
-    // Strip markdown links → keep text only; remove bare URLs
+    if (!raw) return null;
+
+    // Strip markdown links -> keep text only; remove bare URLs
     const cleaned = raw
         .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
         .replace(/\(https?:\/\/[^\s)]+\)/g, "")
@@ -75,7 +46,7 @@ function parseMarkdown(raw) {
     const nodes = [];
     let i = 0;
 
-    // Inline: **bold** and `code`
+    // Inline formatting: **bold** and `code`
     const inline = (str, key) => {
         const parts = [];
         const re = /(\*\*([^*]+)\*\*|`([^`]+)`)/g;
@@ -138,7 +109,7 @@ function parseMarkdown(raw) {
             continue;
         }
 
-        // Plain line
+        // Plain paragraph line
         nodes.push(
             <div className="ai-body" key={`p${i}`} style={{ fontSize: "13px", color: "#cbd5e1", lineHeight: 1.7, marginBottom: "2px" }}>
                 {inline(line, `pl${i}`)}
@@ -154,7 +125,7 @@ function parseMarkdown(raw) {
    AI SUMMARY PANEL
 ============================================================ */
 function AISummaryPanel({ markdown, onClose }) {
-    const riskMatch = markdown.match(/executive risk level[:\s*]+(critical|high|medium|low)/i);
+    const riskMatch = (markdown || "").match(/executive risk level[:\s*]+(critical|high|medium|low)/i);
     const riskLevel = riskMatch ? riskMatch[1].toUpperCase() : null;
     const riskColor = { CRITICAL: G.critical, HIGH: G.red, MEDIUM: G.yellow, LOW: G.green }[riskLevel] || G.purple;
 
@@ -168,7 +139,6 @@ function AISummaryPanel({ markdown, onClose }) {
             overflow: "hidden",
             boxShadow: `0 0 40px rgba(139,92,246,0.07), 0 4px 24px rgba(0,0,0,0.3)`,
         }}>
-
             {/* Header */}
             <div style={{
                 display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -184,7 +154,7 @@ function AISummaryPanel({ markdown, onClose }) {
                     }}>✨</div>
                     <div>
                         <div style={{ fontSize: "13px", fontWeight: 700, color: G.text, lineHeight: 1 }}>AI Executive Summary</div>
-                        <div style={{ fontSize: "10px", color: G.muted, fontFamily: G.font, marginTop: "3px" }}>Groq · Llama 3.3 70B Versatile</div>
+                        <div style={{ fontSize: "10px", color: G.muted, fontFamily: G.font, marginTop: "3px" }}>Cloud Architecture Review</div>
                     </div>
                     {riskLevel && (
                         <span style={{
@@ -197,7 +167,8 @@ function AISummaryPanel({ markdown, onClose }) {
                         </span>
                     )}
                 </div>
-                <button onClick={onClose}
+                <button
+                    onClick={onClose}
                     style={{ background: "none", border: "none", color: G.muted, cursor: "pointer", fontSize: "18px", lineHeight: 1, padding: "4px 8px", borderRadius: "5px" }}
                     onMouseEnter={e => e.currentTarget.style.color = G.text}
                     onMouseLeave={e => e.currentTarget.style.color = G.muted}
@@ -294,7 +265,6 @@ function FindingCard({ f, idx }) {
         >
             {/* Header row */}
             <div style={{ display: "flex", alignItems: "center", gap: "14px", padding: "14px 18px" }}>
-                {/* Severity badge */}
                 <span style={{
                     background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.color}44`,
                     borderRadius: "6px", padding: "4px 10px", fontSize: "11px", fontWeight: 700,
@@ -304,7 +274,6 @@ function FindingCard({ f, idx }) {
                     {cfg.icon} {sev}
                 </span>
 
-                {/* Category chip */}
                 {f.category && (
                     <span style={{
                         background: `${G.purple}18`, color: G.purple, border: `1px solid ${G.purple}30`,
@@ -315,17 +284,14 @@ function FindingCard({ f, idx }) {
                     </span>
                 )}
 
-                {/* Issue */}
                 <span style={{ flex: 1, fontWeight: 600, fontSize: "14px", color: G.text }}>{f.issue}</span>
 
-                {/* NIST ref */}
                 {f.nist_reference && (
                     <span style={{ fontSize: "10px", color: G.muted, fontFamily: G.font, textAlign: "right", maxWidth: "180px", lineHeight: 1.4 }}>
                         {f.nist_reference.split(",")[0].trim()}
                     </span>
                 )}
 
-                {/* Chevron */}
                 <span style={{ color: G.muted, fontSize: "12px", transform: expanded ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>▾</span>
             </div>
 
@@ -382,52 +348,43 @@ const FindingsPage = () => {
     const [sortBy, setSortBy] = useState("severity");
 
     useEffect(() => {
-        // Inject styles
-        if (!document.getElementById("findings-styles")) {
-            const s = document.createElement("style");
-            s.id = "findings-styles";
-            s.textContent = `
-        @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
-        *, *::before, *::after { box-sizing: border-box; }
-        body { background: ${G.bg}; color: ${G.text}; font-family: ${G.fontDisplay}; margin: 0; }
-        @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
-        .btn-primary { background: linear-gradient(135deg, ${G.accent}, #0ea5c9); color: #000; border: none; border-radius: 8px; padding: 9px 18px; font-family: ${G.fontDisplay}; font-weight: 600; font-size: 13px; cursor: pointer; transition: opacity 0.2s; }
-        .btn-primary:hover { opacity: 0.85; }
-        .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
-        .btn-ghost { background: transparent; color: ${G.muted}; border: 1px solid ${G.border}; border-radius: 7px; padding: 8px 14px; font-family: ${G.fontDisplay}; font-size: 13px; cursor: pointer; transition: color 0.15s, border-color 0.15s; }
-        .btn-ghost:hover { color: ${G.text}; border-color: ${G.muted}; }
-        .filter-btn { background: transparent; border: 1px solid ${G.border}; border-radius: 6px; padding: 6px 12px; font-family: ${G.font}; font-size: 11px; cursor: pointer; transition: all 0.15s; color: ${G.muted}; }
-        .filter-btn.active { border-color: ${G.accent}; color: ${G.accent}; background: ${G.accent}12; }
-        select { background: ${G.card}; border: 1px solid ${G.border}; color: ${G.text}; border-radius: 7px; padding: 7px 12px; font-family: ${G.fontDisplay}; font-size: 13px; cursor: pointer; outline: none; }
-        ::-webkit-scrollbar { width: 5px; } ::-webkit-scrollbar-track { background: ${G.bg}; } ::-webkit-scrollbar-thumb { background: ${G.border}; border-radius: 3px; }
-      `;
-            document.head.appendChild(s);
-        }
-
         const fetchFindings = async () => {
             try {
                 const token = localStorage.getItem("token");
-                const res = await axios.get(`http://127.0.0.1:5000/findings/${uploadId}`, {
+                const res = await fetch(`${API_BASE_URL}/findings/${uploadId}`, {
                     headers: { Authorization: `Bearer ${token}` },
                 });
-                setFindings(Array.isArray(res.data) ? res.data : []);
-            } catch (e) { console.error(e); }
-            finally { setLoading(false); }
+                const data = await res.json();
+                setFindings(Array.isArray(data) ? data : []);
+            } catch (e) {
+                console.error("Failed to fetch findings", e);
+            } finally {
+                setLoading(false);
+            }
         };
         fetchFindings();
     }, [uploadId]);
 
     const generateAIReport = async () => {
-        setAiLoading(true); setAiSummary("");
+        setAiLoading(true);
+        setAiSummary("");
         try {
             const token = localStorage.getItem("token");
-            const res = await axios.post(`http://127.0.0.1:5000/findings/${uploadId}/ai-summary`, {},
-                { headers: { Authorization: `Bearer ${token}` } });
-            setAiSummary(typeof res.data.summary === "string" ? res.data.summary : JSON.stringify(res.data.summary));
-        } catch (e) { alert("Failed to generate AI report."); }
-        finally { setAiLoading(false); }
+            const res = await fetch(`${API_BASE_URL}/findings/${uploadId}/ai-summary`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                },
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data?.error || "Failed to generate AI report");
+            setAiSummary(typeof data.summary === "string" ? data.summary : JSON.stringify(data.summary));
+        } catch (e) {
+            alert(e.message || "Failed to generate AI report.");
+        } finally {
+            setAiLoading(false);
+        }
     };
 
     // Severity sort order
@@ -454,7 +411,6 @@ const FindingsPage = () => {
             return 0;
         });
 
-    // Counts
     const counts = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 };
     findings.forEach(f => { const k = f.severity?.toUpperCase(); if (counts[k] !== undefined) counts[k]++; });
 
@@ -518,8 +474,6 @@ const FindingsPage = () => {
                             padding: "9px 14px", color: G.text, fontFamily: G.fontDisplay, fontSize: "13px", outline: "none",
                             transition: "border-color 0.2s",
                         }}
-                        onFocus={e => e.target.style.borderColor = G.accent}
-                        onBlur={e => e.target.style.borderColor = G.border}
                     />
                     <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)}>
                         {categories.map(c => <option key={c} value={c}>{c === "ALL" ? "All Categories" : c}</option>)}
@@ -530,32 +484,19 @@ const FindingsPage = () => {
                     </select>
                 </div>
 
-                {/* AI Summary */}
+                {/* Render AISummaryPanel instead of raw pre */}
                 {aiSummary && (
-                    <div style={{
-                        background: `${G.purple}08`, border: `1px solid ${G.purple}33`, borderRadius: "12px",
-                        padding: "18px 20px", marginBottom: "20px",
-                        animation: "fadeUp 0.4s ease",
-                    }}>
-                        <div style={{ fontSize: "11px", color: G.purple, textTransform: "uppercase", letterSpacing: "1px", marginBottom: "10px", fontFamily: G.font, fontWeight: 600 }}>
-                            ✨ AI Executive Summary
-                        </div>
-                        <pre style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", color: G.text, fontFamily: G.font, fontSize: "13px", lineHeight: 1.7, margin: 0 }}>
-                            {aiSummary}
-                        </pre>
-                    </div>
+                    <AISummaryPanel markdown={aiSummary} onClose={() => setAiSummary("")} />
                 )}
 
                 {/* Results count */}
                 {(search || severityFilter !== "ALL" || categoryFilter !== "ALL") && (
                     <div style={{ fontSize: "12px", color: G.muted, marginBottom: "12px", fontFamily: G.font }}>
                         Showing {filtered.length} of {findings.length} findings
-                        {(search || severityFilter !== "ALL" || categoryFilter !== "ALL") && (
-                            <button onClick={() => { setSearch(""); setSeverityFilter("ALL"); setCategoryFilter("ALL"); }}
-                                style={{ marginLeft: "10px", background: "none", border: "none", color: G.accent, cursor: "pointer", fontSize: "12px" }}>
-                                ✕ Clear filters
-                            </button>
-                        )}
+                        <button onClick={() => { setSearch(""); setSeverityFilter("ALL"); setCategoryFilter("ALL"); }}
+                            style={{ marginLeft: "10px", background: "none", border: "none", color: G.accent, cursor: "pointer", fontSize: "12px" }}>
+                            ✕ Clear filters
+                        </button>
                     </div>
                 )}
 

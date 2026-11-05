@@ -1,34 +1,38 @@
-def validate_iam_policy(policy_json):
-    # Must be a JSON object
-    if not isinstance(policy_json, dict):
-        return "Policy must be a JSON object"
+# backend/validate/config_validator.py
 
-    # Must contain Statement
+def validate_iam_policy(policy_json):
+    """
+    Validates that policy_json conforms to standard AWS IAM / resource policy format.
+    Returns None if valid, or an error string if invalid.
+    """
+    if not isinstance(policy_json, dict):
+        return "Policy must be a JSON/YAML object"
+
     if "Statement" not in policy_json:
         return "Missing required field: Statement"
 
     stmts = policy_json["Statement"]
-
-    # Statement must be list or dict
     if not isinstance(stmts, (list, dict)):
         return "Statement must be a list or object"
 
-    # Normalize to list for validation
     if isinstance(stmts, dict):
         stmts = [stmts]
 
-    # Validate each statement
     for i, stmt in enumerate(stmts):
         if not isinstance(stmt, dict):
             return f"Statement[{i}] must be an object"
 
         if "Effect" not in stmt:
-            return f"Statement[{i}] missing Effect"
+            return f"Statement[{i}] missing required Effect"
 
-        if "Action" not in stmt:
-            return f"Statement[{i}] missing Action"
+        effect = str(stmt["Effect"]).strip().lower()
+        if effect not in ("allow", "deny"):
+            return f"Statement[{i}] Effect must be 'Allow' or 'Deny'"
 
-        if "Resource" not in stmt:
-            return f"Statement[{i}] missing Resource"
+        if "Action" not in stmt and "NotAction" not in stmt:
+            return f"Statement[{i}] missing Action or NotAction"
 
-    return None  # valid
+        if "Resource" not in stmt and "NotResource" not in stmt and "Principal" not in stmt:
+            return f"Statement[{i}] missing Resource or Principal"
+
+    return None

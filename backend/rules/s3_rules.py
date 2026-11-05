@@ -29,6 +29,10 @@ def _to_list(value):
 
 
 def detect_public_s3_bucket(policy_json):
+    """
+    Detect public S3 bucket access in bucket policies.
+    Only flags 'Allow' statements. Deny statements (such as KMS enforcement policies) are safe.
+    """
     findings = []
 
     if not isinstance(policy_json, dict) or "Statement" not in policy_json:
@@ -37,8 +41,10 @@ def detect_public_s3_bucket(policy_json):
     statements = policy_json["Statement"]
     if isinstance(statements, dict):
         statements = [statements]
+    elif not isinstance(statements, list):
+        return findings
 
-    seen = set()  # prevent duplicate findings
+    seen = set()
 
     for idx, stmt in enumerate(statements):
         if not isinstance(stmt, dict):
@@ -47,42 +53,48 @@ def detect_public_s3_bucket(policy_json):
         path = f"Statement[{idx}]"
 
         effect = str(stmt.get("Effect", "")).strip().lower()
+        if effect != "allow":
+            # Deny statements (e.g., denying non-KMS traffic) do not make buckets public!
+            continue
+
         principal = stmt.get("Principal", {})
-        actions = _to_list(stmt.get("Action", []))
-
         public = _is_public_principal(principal)
-        allow = (effect == "allow")
+        if not public:
+            continue
 
-        # Rule B: Public read access specifically (more specific)
-        # If Action includes s3:GetObject and it is Allow + public principal
+        actions = _to_list(stmt.get("Action", []))
         actions_lower = [str(a).lower() for a in actions]
-        if allow and public and "s3:getobject" in actions_lower:
-            key = ("public_read_getobject",)
+
+        # Rule 1: Public read access specifically (s3:GetObject)
+        if "s3:getobject" in actions_lower:
+            key = ("public_read_getobject", path)
             if key not in seen:
                 findings.append({
+                    "category": "S3",
                     "type": "s3",
-                    "issue": "S3 public read access (s3:GetObject)",
-                    "detail": "Object read permissions are open to the public (Allow + public Principal).",
-                    "severity": "high",
-                    "nist_reference": "CIS AWS Benchmark 3.1",
-                    "path": path
+                    "issue": "S3 Public Read Access (s3:GetObject)",
+                    "detail": "Object read permissions are open to the public (Allow with public Principal '*').",
+                    "severity": "HIGH",
+                    "remediation": "Restrict 'Principal' to authenticated account ARNs and enable S3 Block Public Access.",
+                    "nist_reference": "AC-3 (Access Enforcement), SC-7 (Boundary Protection)",
+                    "path": path,
                 })
                 seen.add(key)
             continue
 
-
-        # Rule A: Public principal (high-level warning)
-        if allow and public:
-            key = ("public_principal",)
-            if key not in seen:
-                findings.append({
-                    "type": "s3",
-                    "issue": "Public S3 access (Principal '*')",
-                    "detail": "Bucket policy grants access to everyone. Risk of data exposure.",
-                    "severity": "critical",
-                    "nist_reference": "NIST SP 800-53 SC-28",
-                    "path": path
-                })
-                seen.add(key)
+        # Rule 2: General public principal warning
+        key = ("public_principal", path)
+        if key not in seen:
+            findings.append({
+                "category": "S3",
+                "type": "s3",
+                "issue": "Public S3 Bucket Access",
+                "detail": "Bucket policy grants access to everyone (Principal '*'). High risk of data exposure.",
+                "severity": "CRITICAL",
+                "remediation": "Restrict 'Principal' to specific AWS Account ARNs or IAM users.",
+                "nist_reference": "AC-3 (Access Enforcement), SC-7 (Boundary Protection)",
+                "path": path,
+            })
+            seen.add(key)
 
     return findings

@@ -1,9 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import LoginPage from "./LoginPage";
 import FindingsPage from "./FindingsPage";
-
-const API = "http://127.0.0.1:5000";
+import { API_BASE_URL } from "./apiConfig";
 
 const G = {
   bg: "#0a0e1a",
@@ -112,7 +111,6 @@ const injectGlobalStyles = () => {
 /* ============================================================
    SIDEBAR NAV
 ============================================================ */
-
 function Sidebar({ activeTab, setActiveTab, handleLogout }) {
   const navItems = [
     { id: "dashboard", icon: "⬡", label: "Dashboard" },
@@ -271,7 +269,7 @@ function DonutChart({ segments, size = 120 }) {
 function ScoreGauge({ score }) {
   const color = score >= 80 ? G.green : score >= 50 ? G.yellow : G.red;
   const r = 52, cx = 70, cy = 70;
-  const circumference = Math.PI * r; // half circle
+  const circumference = Math.PI * r;
   const dash = (score / 100) * circumference;
 
   return (
@@ -300,18 +298,25 @@ function CompliancePanel({ findings }) {
       color: G.accent,
     },
     "CIS AWS Benchmark": {
-      controls: ["IAM", "S3", "Logging", "Networking", "Database", "Encryption"],
+      controls: ["IAM", "S3", "Logging", "Network", "Database", "Encryption"],
       icon: "🛡",
       color: G.green,
     },
-    "SOC 2 Type II": {
-      controls: ["CC6.1", "CC6.2", "CC6.3", "CC6.6", "CC6.7", "CC7.1", "CC7.2"],
+    "SOC 2 Type II (Estimated Mapping)": {
+      controls: [
+        "CC6.1 (Logical Access Controls)",
+        "CC6.2 (Credential & Key Management)",
+        "CC6.3 (Principle of Least Privilege)",
+        "CC6.6 (Perimeter & Boundary Protection)",
+        "CC6.7 (Data Protection & Encryption)",
+        "CC7.1 (Vulnerability & System Monitoring)",
+        "CC7.2 (Security Incident & Audit Logging)"
+      ],
       icon: "📋",
       color: G.purple,
     },
   };
 
-  // map findings to which framework controls they violate
   const getViolatedControls = (framework) => {
     if (framework === "NIST 800-53") {
       const violated = new Set();
@@ -324,22 +329,38 @@ function CompliancePanel({ findings }) {
       });
       return { violated: violated.size, total: frameworks["NIST 800-53"].controls.length };
     }
+
     if (framework === "CIS AWS Benchmark") {
       const violated = new Set();
       findings.forEach(f => {
-        if (f.category) violated.add(f.category);
+        if (f.category && frameworks["CIS AWS Benchmark"].controls.includes(f.category)) {
+          violated.add(f.category);
+        }
       });
-      const intersection = new Set([...violated].filter(c => frameworks["CIS AWS Benchmark"].controls.includes(c)));
-      return { violated: intersection.size, total: frameworks["CIS AWS Benchmark"].controls.length };
+      return { violated: violated.size, total: frameworks["CIS AWS Benchmark"].controls.length };
     }
-    if (framework === "SOC 2 Type II") {
-      const hasNet = findings.some(f => f.category === "Network");
+
+    if (framework.startsWith("SOC 2")) {
+      const violated = new Set();
       const hasIAM = findings.some(f => f.category === "IAM");
-      const hasLog = findings.some(f => f.category === "Logging");
-      const hasEnc = findings.some(f => f.category === "Encryption");
-      const violations = [hasNet, hasIAM, hasLog, hasEnc].filter(Boolean).length;
-      return { violated: Math.min(violations * 2, 7), total: 7 };
+      const hasKey = findings.some(f => f.category === "Secrets" || (f.issue || "").toLowerCase().includes("key"));
+      const hasPriv = findings.some(f => (f.issue || "").toLowerCase().includes("privilege") || (f.issue || "").toLowerCase().includes("permissive") || (f.issue || "").toLowerCase().includes("wildcard"));
+      const hasNet = findings.some(f => f.category === "Network" || f.category === "S3");
+      const hasEnc = findings.some(f => f.category === "Encryption" || (f.issue || "").toLowerCase().includes("unencrypted") || (f.issue || "").toLowerCase().includes("tls"));
+      const hasMon = findings.some(f => f.category === "Config" || (f.issue || "").toLowerCase().includes("monitoring"));
+      const hasLog = findings.some(f => f.category === "Logging" || (f.issue || "").toLowerCase().includes("logging"));
+
+      if (hasIAM) violated.add("CC6.1");
+      if (hasKey) violated.add("CC6.2");
+      if (hasPriv) violated.add("CC6.3");
+      if (hasNet) violated.add("CC6.6");
+      if (hasEnc) violated.add("CC6.7");
+      if (hasMon) violated.add("CC7.1");
+      if (hasLog) violated.add("CC7.2");
+
+      return { violated: violated.size, total: 7 };
     }
+
     return { violated: 0, total: 1 };
   };
 
@@ -429,21 +450,28 @@ function exportPDF(findings, uploadInfo = "") {
   w.document.close();
   setTimeout(() => { w.print(); }, 400);
 }
+
 /* ============================================================
    DASHBOARD TAB
 ============================================================ */
-function DashboardTab({ allFindings, scanResults }) {
+function DashboardTab({ allFindings, historyList }) {
   const counts = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 };
-  allFindings.forEach(f => { if (counts[f.severity?.toUpperCase()] !== undefined) counts[f.severity.toUpperCase()]++; });
+  allFindings.forEach(f => {
+    const k = f.severity?.toUpperCase();
+    if (counts[k] !== undefined) counts[k]++;
+  });
 
   const categories = {};
-  allFindings.forEach(f => { categories[f.category || "Other"] = (categories[f.category || "Other"] || 0) + 1; });
+  allFindings.forEach(f => {
+    const cat = f.category || "General";
+    categories[cat] = (categories[cat] || 0) + 1;
+  });
 
   const catData = Object.entries(categories).map(([label, value]) => ({ label, value }));
   const catColors = [G.accent, G.purple, G.green, G.yellow, G.red, "#f97316", "#06b6d4"];
 
-  const avgScore = scanResults.length > 0
-    ? Math.round(scanResults.reduce((s, r) => s + (r.score || 0), 0) / scanResults.length)
+  const avgScore = historyList.length > 0
+    ? Math.round(historyList.reduce((s, r) => s + (r.score ?? 100), 0) / historyList.length)
     : 100;
 
   return (
@@ -453,7 +481,7 @@ function DashboardTab({ allFindings, scanResults }) {
         <StatCard label="Total Issues" value={allFindings.length} icon="⚠" color={G.text} delay={0} />
         <StatCard label="Critical" value={counts.CRITICAL} icon="🔴" color={G.critical} delay={60} />
         <StatCard label="High" value={counts.HIGH} icon="🟠" color={G.red} delay={120} />
-        <StatCard label="Files Scanned" value={scanResults.length} icon="📂" color={G.accent} delay={180} />
+        <StatCard label="Files Scanned" value={historyList.length} icon="📂" color={G.accent} delay={180} />
       </div>
 
       {/* Charts row */}
@@ -499,7 +527,7 @@ function DashboardTab({ allFindings, scanResults }) {
         </div>
       </div>
 
-      {allFindings.length === 0 && (
+      {allFindings.length === 0 && historyList.length === 0 && (
         <div style={{ textAlign: "center", padding: "40px", color: G.muted, fontSize: "14px" }}>
           Upload and scan cloud config files to see your dashboard metrics
         </div>
@@ -509,7 +537,7 @@ function DashboardTab({ allFindings, scanResults }) {
 }
 
 /* ============================================================
-   SCAN TAB
+   SCAN TAB (Supports JSON and YAML)
 ============================================================ */
 function ScanTab({ onScanComplete }) {
   const [files, setFiles] = useState([]);
@@ -535,7 +563,7 @@ function ScanTab({ onScanComplete }) {
       const formData = new FormData();
       Array.from(fileList).forEach(f => formData.append("files", f));
 
-      const res = await fetch("http://127.0.0.1:5000/upload/batch", {
+      const res = await fetch(`${API_BASE_URL}/upload/batch`, {
         method: "POST",
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         body: formData,
@@ -581,10 +609,10 @@ function ScanTab({ onScanComplete }) {
           Drop cloud config files here
         </div>
         <div style={{ fontSize: "13px", color: G.muted, marginBottom: "20px" }}>
-          Supports AWS IAM policies, Security Groups, RDS configs (.json)
+          Supports AWS IAM policies, S3 bucket policies, Security Groups (.json, .yaml, .yml)
         </div>
         <label style={{ cursor: "pointer" }}>
-          <input type="file" accept=".json" multiple style={{ display: "none" }}
+          <input type="file" accept=".json,.yaml,.yml" multiple style={{ display: "none" }}
             onChange={e => { setFiles([...e.target.files]); handleUpload(e.target.files); }} />
           <span className="btn-primary" style={{ padding: "10px 24px", display: "inline-block" }}>
             {loading ? "⟳ Scanning..." : "Select Files"}
@@ -627,7 +655,7 @@ function ScanTab({ onScanComplete }) {
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
             <div style={{ textAlign: "right" }}>
-              <div style={{ fontSize: "22px", fontWeight: 700, color: scoreColor(r.score || 0), fontFamily: G.font }}>{r.score}</div>
+              <div style={{ fontSize: "22px", fontWeight: 700, color: scoreColor(r.score ?? 100), fontFamily: G.font }}>{r.score}</div>
               <div style={{ fontSize: "11px", color: G.muted }}>score</div>
             </div>
             <button onClick={() => navigate(`/findings/${r.upload_id}`)} className="btn-primary">
@@ -643,62 +671,21 @@ function ScanTab({ onScanComplete }) {
 /* ============================================================
    HISTORY TAB
 ============================================================ */
-function HistoryTab({ onFindingsLoaded }) {
-  const [history, setHistory] = useState([]);
-  const [loading, setLoading] = useState(true);
+function HistoryTab({ history, loading, onDelete, allFindings }) {
   const [deleting, setDeleting] = useState(null);
   const [search, setSearch] = useState("");
-  const [allFindings, setAllFindings] = useState([]);
   const navigate = useNavigate();
-
-  const fetchHistory = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch("http://127.0.0.1:5000/history", {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-      });
-      const data = await res.json();
-      setHistory(Array.isArray(data) ? data : []);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Load all findings for export
-  const loadAllFindings = async (historyItems) => {
-    const allF = [];
-    for (const h of historyItems.slice(0, 20)) {
-      try {
-        const res = await fetch(`http://127.0.0.1:5000/findings/${h.id}`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        });
-        const f = await res.json();
-        if (Array.isArray(f)) allF.push(...f);
-      } catch (e) { /* skip */ }
-    }
-    setAllFindings(allF);
-    if (onFindingsLoaded) onFindingsLoaded(allF);
-  };
-
-  useEffect(() => {
-    fetchHistory();
-  }, []);
-
-  useEffect(() => {
-    if (history.length > 0) loadAllFindings(history);
-  }, [history]);
 
   const handleDelete = async (id) => {
     if (!window.confirm("Delete this scan and all its findings?")) return;
     setDeleting(id);
     try {
-      await fetch(`http://127.0.0.1:5000/history/${id}`, {
+      const res = await fetch(`${API_BASE_URL}/history/${id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
-      setHistory(prev => prev.filter(h => h.id !== id));
+      if (!res.ok) throw new Error("Delete failed");
+      if (onDelete) onDelete(id);
     } catch (e) {
       alert("Delete failed.");
     } finally {
@@ -763,7 +750,7 @@ function HistoryTab({ onFindingsLoaded }) {
             <div>
               <div style={{ fontWeight: 600, color: G.text, fontSize: "14px", fontFamily: G.font }}>{h.filename}</div>
               <div style={{ fontSize: "11px", color: G.muted, marginTop: "2px" }}>
-                {h.timestamp || "—"}
+                {h.timestamp || "—"} &nbsp;·&nbsp; {h.findings_count ?? 0} finding{h.findings_count !== 1 ? "s" : ""}
               </div>
             </div>
           </div>
@@ -790,18 +777,61 @@ function HistoryTab({ onFindingsLoaded }) {
   );
 }
 
-/* ===============================
-main upload manager
-================================ */
+/* ============================================================
+   MAIN UPLOAD MANAGER
+============================================================ */
 function UploadManager({ handleLogout }) {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [allFindings, setAllFindings] = useState([]);
-  const [scanResults, setScanResults] = useState(() => {
-    const s = sessionStorage.getItem("batchResults");
-    return s ? JSON.parse(s) : [];
-  });
+  const [historyList, setHistoryList] = useState([]);
+  const [loadingData, setLoadingData] = useState(true);
 
   useEffect(() => { injectGlobalStyles(); }, []);
+
+  // Centralized data loading: fetches history & findings on mount
+  const loadUserData = useCallback(async () => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    try {
+      setLoadingData(true);
+      const [histRes, findRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/history`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        fetch(`${API_BASE_URL}/findings`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+      ]);
+
+      if (histRes.ok) {
+        const histData = await histRes.json();
+        setHistoryList(Array.isArray(histData) ? histData : []);
+      }
+      if (findRes.ok) {
+        const findData = await findRes.json();
+        setAllFindings(Array.isArray(findData) ? findData : []);
+      }
+    } catch (e) {
+      console.error("Failed to load user scans", e);
+    } finally {
+      setLoadingData(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadUserData();
+  }, [loadUserData]);
+
+  const handleScanComplete = () => {
+    // Refresh user data immediately so dashboard and history show updated counts
+    loadUserData();
+  };
+
+  const handleDeleteHistory = (deletedId) => {
+    setHistoryList(prev => prev.filter(h => h.id !== deletedId));
+    setAllFindings(prev => prev.filter(f => f.upload_id !== deletedId));
+  };
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: G.bg }}>
@@ -826,13 +856,18 @@ function UploadManager({ handleLogout }) {
         </div>
 
         {activeTab === "dashboard" && (
-          <DashboardTab allFindings={allFindings} scanResults={scanResults} />
+          <DashboardTab allFindings={allFindings} historyList={historyList} />
         )}
         {activeTab === "scan" && (
-          <ScanTab onScanComplete={(results) => setScanResults(results)} />
+          <ScanTab onScanComplete={handleScanComplete} />
         )}
         {activeTab === "history" && (
-          <HistoryTab onFindingsLoaded={setAllFindings} />
+          <HistoryTab
+            history={historyList}
+            loading={loadingData}
+            onDelete={handleDeleteHistory}
+            allFindings={allFindings}
+          />
         )}
         {activeTab === "compliance" && (
           <CompliancePanel findings={allFindings} />
@@ -841,9 +876,10 @@ function UploadManager({ handleLogout }) {
     </div>
   );
 }
-/* ===============================
+
+/* ============================================================
    MAIN APP ROUTER
-================================ */
+============================================================ */
 export default function App() {
   const [token, setToken] = useState(localStorage.getItem("token"));
   const navigate = useNavigate();

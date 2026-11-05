@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-
-const API = "http://127.0.0.1:5000";
+import { API_BASE_URL } from "./apiConfig";
 
 export default function LoginPage({ onLoginSuccess, mode = "signin" }) {
     const [email, setEmail] = useState("");
@@ -16,20 +15,24 @@ export default function LoginPage({ onLoginSuccess, mode = "signin" }) {
     const [confirmPassword, setConfirmPassword] = useState("");
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-    const needsConfirm = mode === "forgot" && step === 2;
+    const needsConfirm = mode === "register" || (mode === "forgot" && step === 2);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError(null);
         setSuccessMsg(null);
 
-        const needsConfirm = mode === "register" || (mode === "forgot" && step === 2);
+        if (needsConfirm && password !== confirmPassword) {
+            setError("Passwords do not match");
+            return;
+        }
+
         setLoading(true);
 
         try {
             // STEP 1: Handling the "Forgot Password" Email Request
-            if (mode === 'forgot' && step === 1) {
-                const response = await fetch(`${API}/forgot-password`, {
+            if (mode === "forgot" && step === 1) {
+                const response = await fetch(`${API_BASE_URL}/forgot-password`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ email }),
@@ -52,8 +55,7 @@ export default function LoginPage({ onLoginSuccess, mode = "signin" }) {
                 ? { email, password, code: resetCode }
                 : { email, password };
 
-            // FIX: Use the 'endpoint' and 'payload' variables here!
-            const response = await fetch(`${API}${endpoint}`, {
+            const response = await fetch(`${API_BASE_URL}${endpoint}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload),
@@ -62,12 +64,12 @@ export default function LoginPage({ onLoginSuccess, mode = "signin" }) {
             const data = await response.json();
             if (!response.ok) throw new Error(data.error || "Action failed");
 
-            if (mode === 'register') {
+            if (mode === "register") {
                 setSuccessMsg("Account created! Redirecting to login...");
-                setTimeout(() => navigate("/login"), 2000);
-            } else if (mode === 'forgot') {
+                setTimeout(() => navigate("/login"), 1500);
+            } else if (mode === "forgot") {
                 setSuccessMsg("Password reset successfully! Redirecting to login...");
-                setTimeout(() => navigate("/login"), 2000);
+                setTimeout(() => navigate("/login"), 1500);
             } else {
                 // Successful Login
                 onLoginSuccess(data.access_token);
@@ -94,10 +96,10 @@ export default function LoginPage({ onLoginSuccess, mode = "signin" }) {
                         required
                         onChange={(e) => setEmail(e.target.value)}
                         style={inputStyle}
-                        disabled={mode === 'forgot' && step === 2} // Lock email during reset
+                        disabled={mode === "forgot" && step === 2}
                     />
 
-                    {mode === 'forgot' && step === 2 && (
+                    {mode === "forgot" && step === 2 && (
                         <input
                             type="text"
                             placeholder="6-Digit Code"
@@ -108,7 +110,6 @@ export default function LoginPage({ onLoginSuccess, mode = "signin" }) {
                         />
                     )}
 
-                    {/* Show password field if NOT in forgot mode Step 1 */}
                     {(mode !== "forgot" || step === 2) && (
                         <div style={{ position: "relative", width: "100%" }}>
                             <input
@@ -125,7 +126,6 @@ export default function LoginPage({ onLoginSuccess, mode = "signin" }) {
                         </div>
                     )}
 
-                    {/* Confirm password — register and forgot only */}
                     {needsConfirm && (
                         <div style={{ position: "relative", width: "100%" }}>
                             <input
@@ -146,7 +146,6 @@ export default function LoginPage({ onLoginSuccess, mode = "signin" }) {
                             >
                                 {showConfirmPassword ? "Hide" : "Show"}
                             </button>
-                            {/* Live mismatch hint */}
                             {confirmPassword && password !== confirmPassword && (
                                 <p style={{ color: "red", fontSize: "12px", marginTop: "-10px", marginBottom: "10px", textAlign: "left" }}>
                                     Passwords do not match
@@ -159,7 +158,7 @@ export default function LoginPage({ onLoginSuccess, mode = "signin" }) {
                         {loading ? "Processing..." :
                             mode === "signin" ? "Login" :
                                 mode === "register" ? "Sign Up" :
-                                    step === 1 ? "Send Reset Link" : "Update Password"}
+                                    step === 1 ? "Send Reset Code" : "Update Password"}
                     </button>
                 </form>
 
@@ -183,7 +182,6 @@ export default function LoginPage({ onLoginSuccess, mode = "signin" }) {
         </div>
     );
 }
-
 
 const toggleButtonStyle = { position: "absolute", right: "10px", top: "12px", background: "none", border: "none", color: "#1a73e8", cursor: "pointer", fontSize: "12px", fontWeight: "600", zIndex: 2 };
 const containerStyle = { display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh", fontFamily: "sans-serif", backgroundColor: "#f8f9fa" };

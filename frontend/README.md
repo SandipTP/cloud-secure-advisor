@@ -1,16 +1,50 @@
-# React + Vite
+# CloudSecure Advisor - Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Modern, cybersecurity-grade React dashboard built with Vite, Tailwind-style design tokens, and SVG data visualizations for cloud security posture analysis.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Security Posture Dashboard**: Real-time KPI metrics, interactive severity mix donut chart, category breakdown bar chart, and average security score gauge.
+- **Multi-File & Drag-and-Drop Scanner**: Scan multiple AWS cloud configurations simultaneously (supports `.json`, `.yaml`, `.yml`).
+- **Scan History**: Full historical log of scans with search, score badges, details routing, and one-click deletion.
+- **Compliance Alignment**: Evaluates findings against NIST SP 800-53 controls, CIS AWS Benchmark categories, and SOC 2 Type II common criteria.
+- **Interactive AI Executive Summary**: Rendered via `AISummaryPanel` with structured sections for Executive Risk Level, Key Threats, Immediate Action Items, and Prevention Strategies.
+- **Report Exports**: Instant one-click export to CSV and formatted printable PDF.
 
-## React Compiler
+## Getting Started
 
-The React Compiler is currently not compatible with SWC. See [this issue](https://github.com/vitejs/vite-plugin-react/issues/428) for tracking the progress.
+### Prerequisites
 
-## Expanding the ESLint configuration
+- Node.js (v18 or higher)
+- npm or pnpm
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+### Installation
+
+```bash
+cd frontend
+npm install
+```
+
+### Environment Configuration
+
+By default, the frontend connects to the backend at `http://127.0.0.1:5000`. To customize the API endpoint, create a `.env.local` file:
+
+```env
+VITE_API_URL=http://127.0.0.1:5000
+```
+
+### Development Server
+
+```bash
+npm run dev
+```
+
+The Vite dev server will start at `http://localhost:5173`.
+
+### Production Build
+
+```bash
+npm run build
+```
+
+Build outputs are generated in `frontend/dist/`.
