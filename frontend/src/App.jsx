@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import LoginPage from "./LoginPage";
 import FindingsPage from "./FindingsPage";
 import CompliancePanel from "./CompliancePanel";
+import SettingsPanel from "./SettingsPanel";
 import { API_BASE_URL } from "./apiConfig";
 
 const G = {
@@ -118,6 +119,7 @@ function Sidebar({ activeTab, setActiveTab, handleLogout }) {
     { id: "scan", icon: "⟳", label: "Scan Files" },
     { id: "history", icon: "◷", label: "History" },
     { id: "compliance", icon: "⬜", label: "Compliance" },
+    { id: "settings", icon: "⚙", label: "Settings" },
   ];
 
   return (
@@ -726,12 +728,14 @@ function UploadManager({ handleLogout }) {
             {activeTab === "scan" && "Scan Files"}
             {activeTab === "history" && "Scan History"}
             {activeTab === "compliance" && "Compliance Overview"}
+            {activeTab === "settings" && "Account Settings"}
           </div>
           <div style={{ fontSize: "13px", color: G.muted, marginTop: "4px" }}>
             {activeTab === "dashboard" && "Overview of your cloud security posture"}
             {activeTab === "scan" && "Upload cloud config files for analysis"}
             {activeTab === "history" && "All previous scans and their findings"}
             {activeTab === "compliance" && "NIST, CIS, and SOC 2 alignment status"}
+            {activeTab === "settings" && "Manage your profile, credentials, and account data"}
           </div>
         </div>
 
@@ -755,6 +759,9 @@ function UploadManager({ handleLogout }) {
             history={historyList}
             onNavigateToScan={() => setActiveTab("scan")}
           />
+        )}
+        {activeTab === "settings" && (
+          <SettingsPanel onLogout={handleLogout} />
         )}
       </main>
     </div>

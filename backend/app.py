@@ -396,6 +396,109 @@ def login():
 
 
 # ============================================================
+# Account & Profile Management
+# ============================================================
+@app.route("/account", methods=["GET"])
+@jwt_required()
+def get_account_profile():
+    user_id = int(get_jwt_identity())
+    user = db.session.get(User, user_id)
+    if not user:
+        return jsonify({"error": "User account not found"}), 404
+
+    scans_count = Upload.query.filter_by(user_id=user.id).count()
+    upload_ids = [u.id for u in user.uploads]
+    findings_count = (
+        Finding.query.filter(Finding.upload_id.in_(upload_ids)).count()
+        if upload_ids
+        else 0
+    )
+
+    return jsonify({
+        "id": user.id,
+        "email": user.email,
+        "created_at": user.created_at,
+        "total_scans": scans_count,
+        "total_findings": findings_count,
+    }), 200
+
+
+@app.route("/account", methods=["PUT"])
+@jwt_required()
+def update_account_profile():
+    user_id = int(get_jwt_identity())
+    user = db.session.get(User, user_id)
+    if not user:
+        return jsonify({"error": "User account not found"}), 404
+
+    data = request.get_json(silent=True) or {}
+    new_email = (data.get("email") or "").strip().lower()
+    current_password = data.get("current_password") or ""
+    new_password = data.get("new_password") or ""
+
+    updated_fields = []
+
+    # Update email
+    if new_email and new_email != user.email.lower():
+        if "@" not in new_email or "." not in new_email:
+            return jsonify({"error": "Please provide a valid email address"}), 400
+
+        # Require current password to change email
+        if not current_password or not verify_password(user.password_hash, current_password):
+            return jsonify({"error": "Current password is required to change your email address"}), 401
+
+        existing = User.query.filter(User.email == new_email, User.id != user.id).first()
+        if existing:
+            return jsonify({"error": "An account with this email address already exists"}), 409
+
+        user.email = new_email
+        updated_fields.append("email")
+
+    # Update password
+    if new_password:
+        if not current_password or not verify_password(user.password_hash, current_password):
+            return jsonify({"error": "Current password is required to set a new password"}), 401
+
+        if len(new_password) < 8:
+            return jsonify({"error": "New password must be at least 8 characters long"}), 400
+
+        if verify_password(user.password_hash, new_password):
+            return jsonify({"error": "New password must be different from your current password"}), 400
+
+        user.password_hash = bcrypt.hashpw(new_password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+        updated_fields.append("password")
+
+    if not updated_fields:
+        return jsonify({"message": "No changes requested", "email": user.email}), 200
+
+    db.session.commit()
+    return jsonify({
+        "message": f"Account {', '.join(updated_fields)} successfully updated.",
+        "email": user.email,
+        "updated_fields": updated_fields,
+    }), 200
+
+
+@app.route("/account", methods=["DELETE"])
+@jwt_required()
+def delete_account():
+    user_id = int(get_jwt_identity())
+    user = db.session.get(User, user_id)
+    if not user:
+        return jsonify({"error": "User account not found"}), 404
+
+    data = request.get_json(silent=True) or {}
+    password = data.get("password") or ""
+
+    if not password or not verify_password(user.password_hash, password):
+        return jsonify({"error": "Current password confirmation is required to delete your account"}), 401
+
+    db.session.delete(user)
+    db.session.commit()
+    return jsonify({"message": "Account and all associated scan data permanently deleted."}), 200
+
+
+# ============================================================
 # Scanning Engine Helper (Shared by Single & Batch Routes)
 # ============================================================
 def process_uploaded_file(file_storage, user_id: int):

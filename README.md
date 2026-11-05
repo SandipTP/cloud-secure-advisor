@@ -51,6 +51,7 @@ cloud-secure-advisor/
 │   ├── src/
 │   │   ├── App.jsx                # Main dashboard, router, scanner, and history views
 │   │   ├── CompliancePanel.jsx    # Interactive multi-framework compliance audit panel
+│   │   ├── SettingsPanel.jsx      # Account settings (email, password, deletion)
 │   │   ├── FindingsPage.jsx       # Detailed findings view and AISummaryPanel
 │   │   ├── LoginPage.jsx          # Sign-in, registration, and password reset flows
 │   │   └── apiConfig.js           # Centralized API endpoint configuration

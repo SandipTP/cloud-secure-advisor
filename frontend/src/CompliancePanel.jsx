@@ -985,3 +985,4 @@ export default function CompliancePanel({ findings = [], history = [], onNavigat
     </div>
   );
 }
+

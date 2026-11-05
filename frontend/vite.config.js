@@ -14,6 +14,7 @@ export default defineConfig({
       "/signup": { target: "http://127.0.0.1:5000", changeOrigin: true },
       "/forgot-password": { target: "http://127.0.0.1:5000", changeOrigin: true },
       "/reset-password": { target: "http://127.0.0.1:5000", changeOrigin: true },
+      "/account": { target: "http://127.0.0.1:5000", changeOrigin: true },
     }
   }
 })

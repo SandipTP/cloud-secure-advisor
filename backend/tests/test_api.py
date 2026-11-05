@@ -218,6 +218,74 @@ Statement:
         self.assertEqual(res.status_code, 400)
         self.assertIn("Batch upload limit exceeded", res.get_json()["error"])
 
+    def test_account_profile_update_and_delete(self):
+        email = "user_settings@example.com"
+        password = "original_password123"
+        headers = self._register_and_login(email=email, password=password)
+
+        # 1. Fetch profile
+        res_get = self.client.get("/account", headers=headers)
+        self.assertEqual(res_get.status_code, 200)
+        profile = res_get.get_json()
+        self.assertEqual(profile["email"], email)
+        self.assertEqual(profile["total_scans"], 0)
+
+        # 2. Update password - fail with wrong current password
+        bad_pw_res = self.client.put(
+            "/account",
+            json={"current_password": "wrong_password", "new_password": "brand_new_password123"},
+            headers=headers
+        )
+        self.assertEqual(bad_pw_res.status_code, 401)
+
+        # 3. Update password - succeed
+        good_pw_res = self.client.put(
+            "/account",
+            json={"current_password": password, "new_password": "brand_new_password123"},
+            headers=headers
+        )
+        self.assertEqual(good_pw_res.status_code, 200)
+
+        # Verify login works with new password
+        login_res = self.client.post(
+            "/login",
+            json={"email": email, "password": "brand_new_password123"}
+        )
+        self.assertEqual(login_res.status_code, 200)
+        new_token = login_res.get_json()["access_token"]
+        new_headers = {"Authorization": f"Bearer {new_token}"}
+
+        # 4. Update email
+        email_res = self.client.put(
+            "/account",
+            json={"email": "new_email@example.com", "current_password": "brand_new_password123"},
+            headers=new_headers
+        )
+        self.assertEqual(email_res.status_code, 200)
+        self.assertEqual(email_res.get_json()["email"], "new_email@example.com")
+
+        # 5. Delete account
+        del_fail = self.client.delete(
+            "/account",
+            json={"password": "wrong_password"},
+            headers=new_headers
+        )
+        self.assertEqual(del_fail.status_code, 401)
+
+        del_ok = self.client.delete(
+            "/account",
+            json={"password": "brand_new_password123"},
+            headers=new_headers
+        )
+        self.assertEqual(del_ok.status_code, 200)
+
+        # Verify user is gone
+        login_after_del = self.client.post(
+            "/login",
+            json={"email": "new_email@example.com", "password": "brand_new_password123"}
+        )
+        self.assertEqual(login_after_del.status_code, 401)
+
 
 if __name__ == "__main__":
     unittest.main()
