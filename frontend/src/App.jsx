@@ -772,6 +772,11 @@ function UploadManager({ handleLogout }) {
         }),
       ]);
 
+      if (histRes.status === 401 || findRes.status === 401 || profileRes.status === 401) {
+        handleLogout();
+        return;
+      }
+
       if (histRes.ok) {
         const histData = await histRes.json();
         setHistoryList(Array.isArray(histData) ? histData : []);
@@ -896,7 +901,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={!token ? <LoginPage mode="signin" onLoginSuccess={updateToken} /> : <Navigate to="/" />} />
-      <Route path="/register" element={!token ? <LoginPage mode="register" onLoginSuccess={updateToken} /> : <Navigate to="/" />} />
+      <Route path="/register" element={!token ? <LoginPage mode="register" onLoginSuccess={updateToken} /> : <Navigate to="/complete-profile" />} />
       <Route path="/forgot-password" element={<LoginPage mode="forgot" />} />
       <Route path="/complete-profile" element={token ? <CompleteProfilePage onProfileSaved={() => navigate("/")} /> : <Navigate to="/login" />} />
       <Route path="/" element={token ? <UploadManager handleLogout={handleLogout} /> : <Navigate to="/login" />} />

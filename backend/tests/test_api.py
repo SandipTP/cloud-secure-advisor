@@ -47,9 +47,30 @@ class CloudSecureAdvisorTestCase(unittest.TestCase):
         return {"Authorization": f"Bearer {token}"}
 
     def test_signup_and_login(self):
+        # 1. Invalid email rejection
+        res_bad_email = self.client.post("/signup", json={"email": "bademailformat", "password": "securepass123"})
+        self.assertEqual(res_bad_email.status_code, 400)
+        self.assertIn("valid email", res_bad_email.get_json()["error"])
+
+        # 2. Short password rejection
+        res_short_pw = self.client.post("/signup", json={"email": "short@example.com", "password": "short"})
+        self.assertEqual(res_short_pw.status_code, 400)
+        self.assertIn("at least 8 characters", res_short_pw.get_json()["error"])
+
+        # 3. Successful signup
         res = self.client.post("/signup", json={"email": "alice@example.com", "password": "securepass123"})
         self.assertEqual(res.status_code, 201)
+        self.assertIn("access_token", res.get_json())
 
+        # 4. Duplicate signup rejection
+        res_dup = self.client.post("/signup", json={"email": "alice@example.com", "password": "securepass123"})
+        self.assertEqual(res_dup.status_code, 409)
+
+        # 5. Invalid credentials login
+        res_wrong_pw = self.client.post("/login", json={"email": "alice@example.com", "password": "wrongpassword"})
+        self.assertEqual(res_wrong_pw.status_code, 401)
+
+        # 6. Successful login
         res2 = self.client.post("/login", json={"email": "alice@example.com", "password": "securepass123"})
         self.assertEqual(res2.status_code, 200)
         self.assertIn("access_token", res2.get_json())

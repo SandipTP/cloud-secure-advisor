@@ -43,6 +43,11 @@ export default function CompleteProfilePage({ onProfileSaved }) {
         const res = await fetch(`${API_BASE_URL}/account`, {
           headers: { Authorization: `Bearer ${token}` },
         });
+        if (res.status === 401) {
+          localStorage.removeItem("token");
+          navigate("/login");
+          return;
+        }
         if (res.ok) {
           const data = await res.json();
           if (data.first_name) setFirstName(data.first_name);
@@ -335,3 +340,4 @@ const inputStyle = {
   outline: "none",
   boxSizing: "border-box",
 };
+

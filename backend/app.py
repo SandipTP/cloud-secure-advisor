@@ -264,9 +264,13 @@ def create_user(
         phone=(phone or "").strip() or None,
         created_at=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     )
-    db.session.add(user)
-    db.session.commit()
-    return True
+    try:
+        db.session.add(user)
+        db.session.commit()
+        return True
+    except Exception:
+        db.session.rollback()
+        return False
 
 
 def verify_password(stored_hash: str, password: str) -> bool:
@@ -315,8 +319,10 @@ def forgot_password():
         .first()
     )
     now_utc = datetime.now(timezone.utc)
-    if recent_token and (now_utc - recent_token.created_at.replace(tzinfo=timezone.utc)).total_seconds() < 60:
-        return jsonify({"error": "Please wait at least 60 seconds before requesting another code."}), 429
+    if recent_token:
+        token_created = recent_token.created_at.replace(tzinfo=timezone.utc) if recent_token.created_at.tzinfo is None else recent_token.created_at
+        if (now_utc - token_created).total_seconds() < 60:
+            return jsonify({"error": "Please wait at least 60 seconds before requesting another code."}), 429
 
     # Generate cryptographically secure 6-digit code
     code = f"{secrets.randbelow(1000000):06d}"
@@ -426,6 +432,9 @@ def signup():
 
     if not email or not password:
         return jsonify({"error": "Email and password required"}), 400
+
+    if "@" not in email or "." not in email:
+        return jsonify({"error": "Please provide a valid email address"}), 400
 
     if len(password) < 8:
         return jsonify({"error": "Password must be at least 8 characters"}), 400
