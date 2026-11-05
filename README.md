@@ -4,7 +4,7 @@
 
 ---
 
-## 🌟 Key Features
+##  Key Features
 
 - **Dual-Engine Security Scanner**:
   - **Structured AST Engine**: Deep structural analysis of AWS IAM policies, S3 bucket policies, and VPC Security Groups using Python AST parsing (`iam_rules.py`, `s3_rules.py`, `sg_rules.py`, `config_validator.py`). Accurately evaluates `Effect: "Allow"` vs `Effect: "Deny"` to eliminate false positives on security-hardening policies (e.g., KMS-enforced deny statements).
@@ -64,7 +64,7 @@ cloud-secure-advisor/
 
 ---
 
-## 🚀 Quick Start Guide
+##  Quick Start Guide
 
 ### 1. Backend Setup
 
@@ -118,7 +118,7 @@ cloud-secure-advisor/
 
 ---
 
-## 🧪 Running Automated Tests
+##  Running Automated Tests
 
 Run the test suite using Python:
 
@@ -137,7 +137,7 @@ The test suite validates:
 
 ---
 
-## 📡 REST API Reference
+##  REST API Reference
 
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
