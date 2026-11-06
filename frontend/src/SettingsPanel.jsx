@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { API_BASE_URL } from "./apiConfig";
+import { API_BASE_URL, safeJson } from "./apiConfig";
 
 const G = {
   bg: "#0a0e1a",
@@ -59,7 +59,7 @@ export default function SettingsPanel({ onLogout, onEmailUpdated, onProfileUpdat
         const res = await fetch(`${API_BASE_URL}/account`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        const data = await res.json();
+        const data = await safeJson(res);
         if (!res.ok) throw new Error(data.error || "Failed to load profile");
         setProfile(data);
         setNewEmail(data.email || "");
@@ -102,7 +102,7 @@ export default function SettingsPanel({ onLogout, onEmailUpdated, onProfileUpdat
           phone: phone.trim() || null,
         }),
       });
-      const data = await res.json();
+      const data = await safeJson(res);
       if (!res.ok) throw new Error(data.error || "Failed to update personal details");
 
       const updated = data.profile || {
@@ -150,7 +150,7 @@ export default function SettingsPanel({ onLogout, onEmailUpdated, onProfileUpdat
           current_password: emailPassword,
         }),
       });
-      const data = await res.json();
+      const data = await safeJson(res);
       if (!res.ok) throw new Error(data.error || "Failed to update email");
 
       setProfile(prev => ({ ...prev, email: data.email }));
@@ -198,7 +198,7 @@ export default function SettingsPanel({ onLogout, onEmailUpdated, onProfileUpdat
           new_password: newPassword,
         }),
       });
-      const data = await res.json();
+      const data = await safeJson(res);
       if (!res.ok) throw new Error(data.error || "Failed to change password");
 
       setCurrentPassword("");
@@ -229,7 +229,7 @@ export default function SettingsPanel({ onLogout, onEmailUpdated, onProfileUpdat
         },
         body: JSON.stringify({ password: deletePassword }),
       });
-      const data = await res.json();
+      const data = await safeJson(res);
       if (!res.ok) throw new Error(data.error || "Failed to delete account");
 
       alert("Your account and all associated scan data have been permanently deleted.");

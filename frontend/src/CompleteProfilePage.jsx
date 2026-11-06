@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { API_BASE_URL } from "./apiConfig";
+import { API_BASE_URL, safeJson } from "./apiConfig";
 
 const G = {
   bg: "#0a0e1a",
@@ -49,7 +49,7 @@ export default function CompleteProfilePage({ onProfileSaved }) {
           return;
         }
         if (res.ok) {
-          const data = await res.json();
+          const data = await safeJson(res);
           if (data.first_name) setFirstName(data.first_name);
           if (data.last_name) setLastName(data.last_name);
           if (data.dob) setDob(data.dob);
@@ -94,7 +94,7 @@ export default function CompleteProfilePage({ onProfileSaved }) {
         }),
       });
 
-      const data = await res.json();
+      const data = await safeJson(res);
       if (!res.ok) throw new Error(data.error || "Failed to save profile details");
 
       setSuccess(true);

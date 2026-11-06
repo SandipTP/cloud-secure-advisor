@@ -5,7 +5,7 @@ import CompleteProfilePage from "./CompleteProfilePage";
 import FindingsPage from "./FindingsPage";
 import CompliancePanel from "./CompliancePanel";
 import SettingsPanel from "./SettingsPanel";
-import { API_BASE_URL } from "./apiConfig";
+import { API_BASE_URL, safeJson } from "./apiConfig";
 
 const G = {
   bg: "#0a0e1a",
@@ -532,7 +532,7 @@ function ScanTab({ onScanComplete }) {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         body: formData,
       });
-      const data = await res.json();
+      const data = await safeJson(res);
       if (!res.ok) throw new Error(data?.error || "Server Error");
 
       const resList = data?.results || [];
@@ -778,15 +778,15 @@ function UploadManager({ handleLogout }) {
       }
 
       if (histRes.ok) {
-        const histData = await histRes.json();
+        const histData = await safeJson(histRes);
         setHistoryList(Array.isArray(histData) ? histData : []);
       }
       if (findRes.ok) {
-        const findData = await findRes.json();
+        const findData = await safeJson(findRes);
         setAllFindings(Array.isArray(findData) ? findData : []);
       }
       if (profileRes.ok) {
-        const profileData = await profileRes.json();
+        const profileData = await safeJson(profileRes);
         setUserProfile(profileData);
       }
     } catch (e) {

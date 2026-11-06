@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { API_BASE_URL } from "./apiConfig";
+import { API_BASE_URL, safeJson } from "./apiConfig";
 
 const G = {
   bg: "#0a0e1a",
@@ -89,7 +89,7 @@ export default function LoginPage({ onLoginSuccess, mode = "signin" }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email: cleanEmail }),
         });
-        const data = await response.json();
+        const data = await safeJson(response);
         if (!response.ok) throw new Error(data.error || "Failed to send reset code");
 
         setSuccessMsg("If an account exists with this email, a 6-digit code has been sent.");
@@ -114,7 +114,7 @@ export default function LoginPage({ onLoginSuccess, mode = "signin" }) {
         body: JSON.stringify(payload),
       });
 
-      const data = await response.json();
+      const data = await safeJson(response);
       if (!response.ok) throw new Error(data.error || "Action failed");
 
       if (mode === "register") {

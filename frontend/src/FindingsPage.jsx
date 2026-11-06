@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { API_BASE_URL } from "./apiConfig";
+import { API_BASE_URL, safeJson } from "./apiConfig";
 
 /* ============================================================
    DESIGN TOKENS
@@ -354,7 +354,7 @@ const FindingsPage = () => {
                 const res = await fetch(`${API_BASE_URL}/findings/${uploadId}`, {
                     headers: { Authorization: `Bearer ${token}` },
                 });
-                const data = await res.json();
+                const data = await safeJson(res);
                 setFindings(Array.isArray(data) ? data : []);
             } catch (e) {
                 console.error("Failed to fetch findings", e);
@@ -377,7 +377,7 @@ const FindingsPage = () => {
                     Authorization: `Bearer ${token}`,
                 },
             });
-            const data = await res.json();
+            const data = await safeJson(res);
             if (!res.ok) throw new Error(data?.error || "Failed to generate AI report");
             setAiSummary(typeof data.summary === "string" ? data.summary : JSON.stringify(data.summary));
         } catch (e) {
